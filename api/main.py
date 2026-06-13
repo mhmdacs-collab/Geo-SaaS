@@ -383,25 +383,23 @@ async def activate(req: ActivateReq, request: Request):
                     tenant_id, code["code"],
                 )
             else:
-                # Existing tenant: extend subscription
+                # Existing tenant: extend subscription (بدون updated_at)
                 await conn.execute(
                     """UPDATE tenants SET
                          subscription_status = 'active',
-                         subscription_expires_at = now() + make_interval(days => $2),
-                         updated_at = now()
+                         subscription_expires_at = now() + make_interval(days => $2)
                        WHERE id = $1""",
                     tenant_id, sub_days,
                 )
 
-            # Update tenant identity from device info
+            # Update tenant identity from device info (بدون updated_at)
             try:
                 await conn.execute(
                     """UPDATE tenants SET
                           application_id = COALESCE(NULLIF($2,''), application_id),
                           store_name     = COALESCE(NULLIF($3,''), store_name),
                           tax_number     = COALESCE(NULLIF($4,''), tax_number),
-                          phone_number   = COALESCE(NULLIF($5,''), phone_number),
-                          updated_at     = now()
+                          phone_number   = COALESCE(NULLIF($5,''), phone_number)
                         WHERE id = $1
                           AND (application_id LIKE 'pending-%' OR application_id IS NULL)""",
                     tenant_id, req.device.application_id,
