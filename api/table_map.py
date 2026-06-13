@@ -177,6 +177,62 @@ TABLE_MAP: Dict[str, Dict[str, Any]] = {
         {"Id":"aronium_id","CustomerId":"customer_id","Type":"type",
          "Uid":"uid","Value":"value"},
         conflict=["tenant_id","aronium_id"]),
+
+    # ----- users & taxes -----
+    "User": _t("ar_users",
+        {"Id":"aronium_id","FirstName":"first_name","LastName":"last_name",
+         "Username":"username","Password":"password","AccessLevel":"access_level",
+         "IsEnabled":"is_enabled","Email":"email"},
+        conflict=["tenant_id","aronium_id"]),
+    "Tax": _t("ar_taxes",
+        {"Id":"aronium_id","Name":"name","Rate":"rate","Code":"code",
+         "IsFixed":"is_fixed","IsTaxOnTotal":"is_tax_on_total","IsEnabled":"is_enabled"},
+        conflict=["tenant_id","aronium_id"]),
+    "ProductTax": _t("ar_product_taxes",
+        {"ProductId":"product_id","TaxId":"tax_id"},
+        conflict=["tenant_id","product_id","tax_id"],
+        pk_composite_cols=["product_id","tax_id"]),
+
+    # ----- promotions -----
+    "Promotion": _t("ar_promotions",
+        {"Id":"aronium_id","Name":"name","StartDate":"start_date",
+         "StartTime":"start_time","EndDate":"end_date","EndTime":"end_time",
+         "DaysOfWeek":"days_of_week","IsEnabled":"is_enabled"},
+        conflict=["tenant_id","aronium_id"]),
+    "PromotionItem": _t("ar_promotion_items",
+        {"Id":"aronium_id","PromotionId":"promotion_id","Uid":"uid",
+         "DiscountType":"discount_type","PriceType":"price_type","Value":"value",
+         "IsConditional":"is_conditional","Quantity":"quantity",
+         "ConditionType":"condition_type","QuantityLimit":"quantity_limit"},
+        conflict=["tenant_id","aronium_id"]),
+
+    # ----- voids & comments -----
+    "PosVoid": _t("ar_pos_voids",
+        {"Id":"aronium_id","DocumentId":"document_id","Reason":"reason",
+         "Amount":"amount","Date":"date","UserId":"user_id"},
+        conflict=["tenant_id","aronium_id"]),
+    "ProductComment": _t("ar_product_comments",
+        {"Id":"aronium_id","ProductId":"product_id","Comment":"comment"},
+        conflict=["tenant_id","aronium_id"]),
+
+    # ----- security & cash -----
+    "SecurityKey": _t("ar_security_keys",
+        {"Id":"aronium_id","KeyType":"key_type","KeyValue":"key_value"},
+        conflict=["tenant_id","aronium_id"]),
+    "StartingCash": _t("ar_starting_cash",
+        {"Id":"aronium_id","Amount":"amount","Date":"date","UserId":"user_id"},
+        conflict=["tenant_id","aronium_id"]),
+
+    # ----- printer settings -----
+    "PosPrinterSettings": _t("ar_pos_printer_settings",
+        {"Id":"aronium_id","Name":"name","Type":"type","Port":"port","Settings":"settings"},
+        conflict=["tenant_id","aronium_id"]),
+    "PosPrinterSelection": _t("ar_pos_printer_selections",
+        {"Id":"aronium_id","DocumentTypeId":"document_type_id","PrinterId":"printer_id"},
+        conflict=["tenant_id","aronium_id"]),
+    "PosPrinterSelectionSettings": _t("ar_pos_printer_selection_settings",
+        {"Id":"aronium_id","Key":"key","Value":"value"},
+        conflict=["tenant_id","aronium_id"]),
 }
 
 
