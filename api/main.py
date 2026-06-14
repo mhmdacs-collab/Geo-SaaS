@@ -251,9 +251,7 @@ async def require_agent(authorization: str = Header(None)) -> AgentCtx:
 # ────────────────────────────────────────────────────────────────────────────
 class DeviceInfo(BaseModel):
     application_id: str
-    store_name: Optional[str] = None
-    tax_number: Optional[str] = None
-    phone_number: Optional[str] = None
+    branch_name: Optional[str] = None
     agent_version: Optional[str] = None
     hostname: Optional[str] = None
 
@@ -267,6 +265,8 @@ class ActivateResp(BaseModel):
     token: str
     tenant_id: str
     device_id: str
+    store_name: str = ""
+    tax_number: str = ""
 
 
 class HeartbeatReq(BaseModel):
@@ -362,54 +362,34 @@ async def activate(req: ActivateReq, request: Request):
             if code["expires_at"] < datetime.now(timezone.utc):
                 raise HTTPException(410, "activation code expired")
 
+            # ── الكود يجب أن يكون مرتبطاً بـ tenant مسبقاً ──
+            #    (عبر n8n admin register). الأكواد غير المرتبطة مرفوضة.
             tenant_id = code["tenant_id"]
+            if tenant_id is None:
+                raise HTTPException(400, (
+                    "هذا الكود غير مرتبط بأي عميل. "
+                    "يرجى تسجيل العميل أولاً من لوحة الإدارة."
+                ))
             sub_days = code["subscription_days"] or 30
 
-            if tenant_id is None:
-                # Pre-generated code: create tenant now
-                row = await conn.fetchrow(
-                    """INSERT INTO tenants
-                         (application_id, store_name, tax_number, phone_number,
-                          subscription, subscription_status, subscription_expires_at)
-                       VALUES ($1, $2, $3, $4, 'monthly', 'active',
-                               now() + make_interval(days => $5))
-                       RETURNING id""",
-                    "pending-" + secrets.token_hex(6),
-                    "", "", "", sub_days,
-                )
-                tenant_id = row["id"]
+            # ── تفعيل الاشتراك ──
+            await conn.execute(
+                """UPDATE tenants SET
+                     subscription_status = 'active',
+                     subscription_expires_at = now() + make_interval(days => $2)
+                   WHERE id = $1""",
+                tenant_id, sub_days,
+            )
+
+            # ── تحديث اسم الفرع فقط (لا نغيّر store_name الأصلي) ──
+            branch = (req.device.branch_name or "").strip()
+            if branch:
                 await conn.execute(
-                    "UPDATE activation_codes SET tenant_id = $1 WHERE code = $2",
-                    tenant_id, code["code"],
-                )
-            else:
-                # Existing tenant: extend subscription (بدون updated_at)
-                await conn.execute(
-                    """UPDATE tenants SET
-                         subscription_status = 'active',
-                         subscription_expires_at = now() + make_interval(days => $2)
-                       WHERE id = $1""",
-                    tenant_id, sub_days,
+                    "UPDATE tenants SET branch_name = $2 WHERE id = $1",
+                    tenant_id, branch,
                 )
 
-            # Update tenant identity from device info (بدون updated_at)
-            try:
-                await conn.execute(
-                    """UPDATE tenants SET
-                          application_id = COALESCE(NULLIF($2,''), application_id),
-                          store_name     = COALESCE(NULLIF($3,''), store_name),
-                          tax_number     = COALESCE(NULLIF($4,''), tax_number),
-                          phone_number   = COALESCE(NULLIF($5,''), phone_number)
-                        WHERE id = $1
-                          AND (application_id LIKE 'pending-%' OR application_id IS NULL)""",
-                    tenant_id, req.device.application_id,
-                    req.device.store_name or "",
-                    req.device.tax_number or "",
-                    req.device.phone_number or "",
-                )
-            except asyncpg.UniqueViolationError:
-                log.warning("application_id %s already exists", req.device.application_id)
-
+            # ── إنشاء / تحديث الجهاز ─
             hostname = (req.device.hostname or "unknown")[:255]
             device_row = await conn.fetchrow(
                 """INSERT INTO devices (tenant_id, hostname, agent_version,
@@ -439,9 +419,24 @@ async def activate(req: ActivateReq, request: Request):
                 code["code"],
             )
 
+            # ── قراءة بيانات الـ tenant الفعلية لإرجاعها ─
+            tenant_info = await conn.fetchrow(
+                "SELECT store_name, tax_number, phone_number FROM tenants WHERE id = $1",
+                tenant_id,
+            )
+
     token = _make_token(str(tenant_id), str(device_id), sub_days)
-    log.info("activated tenant=%s device=%s host=%s", tenant_id, device_id, hostname)
-    return ActivateResp(token=token, tenant_id=str(tenant_id), device_id=str(device_id))
+    log.info(
+        "activated tenant=%s device=%s host=%s",
+        tenant_id, device_id, hostname,
+    )
+    return ActivateResp(
+        token=token,
+        tenant_id=str(tenant_id),
+        device_id=str(device_id),
+        store_name=tenant_info["store_name"] if tenant_info else "",
+        tax_number=tenant_info["tax_number"] if tenant_info else "",
+    )
 
 
 @app.post("/api/v1/agents/heartbeat")
