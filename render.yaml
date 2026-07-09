@@ -1,0 +1,27 @@
+# Render Blueprint — adopts the existing aronium-saas-api service.
+# After committing this file, go to render.com -> New -> Blueprint and
+# select the aronium-saas repo. Render will recognize the existing
+# service by name and let you "adopt" it instead of creating a new one.
+services:
+  - type: web
+    name: aronium-saas-api
+    runtime: python
+    repo: https://github.com/mhmdacs-collab/Geo-SaaS  # الصحيح
+    plan: free
+    region: virginia
+    rootDir: api
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_TTL_DAYS
+        value: "365"
+      - key: CORS_ORIGINS
+        value: "https://aronium-saas-dashboard.onrender.com,https://*.onrender.com"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
