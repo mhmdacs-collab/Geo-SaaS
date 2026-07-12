@@ -110,6 +110,7 @@ app.add_middleware(
 # ────────────────────────────────────────────────────────────────────────────
 TS_COLS = {"date_created", "date_updated", "stock_date"}
 DATE_COLS = {"doc_date", "due_date", "pay_date"}
+BOOL_COLS = {"is_enabled", "is_customer", "is_supplier", "is_tax_exempt", "is_price_change_allowed", "is_using_default_quantity", "is_service", "is_tax_inclusive_price"}
 
 _TS_FORMATS = (
     "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S",
@@ -157,6 +158,23 @@ def _to_date(v: Any) -> Optional[date]:
     return None
 
 
+def _to_bool(v: Any) -> Optional[bool]:
+    """Convert string '0'/'1' or 'true'/'false' to boolean."""
+    if v is None:
+        return None
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    if isinstance(v, str):
+        s = v.strip().lower()
+        if s in ('1', 'true', 'yes', 'on'):
+            return True
+        if s in ('0', 'false', 'no', 'off', ''):
+            return False
+    return None
+
+
 def _coerce_row(pg_cols: List[str], values: List[Any]) -> List[Any]:
     out: List[Any] = []
     for col, val in zip(pg_cols, values):
@@ -164,6 +182,8 @@ def _coerce_row(pg_cols: List[str], values: List[Any]) -> List[Any]:
             out.append(_to_datetime(val))
         elif col in DATE_COLS:
             out.append(_to_date(val))
+        elif col in BOOL_COLS:
+            out.append(_to_bool(val))
         else:
             out.append(val)
     return out
