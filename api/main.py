@@ -462,7 +462,7 @@ async def activate(req: ActivateReq, request: Request):
         # 1. Find device by application_id
         device = await conn.fetchrow(
             """SELECT d.id, d.tenant_id, d.branch_name, d.is_active,
-                      t.store_name, t.tax_number, t.expires_at, t.status
+                      t.store_name, t.tax_number, t.expires_at, t.status, t.created_at
                FROM devices d
                JOIN tenants t ON d.tenant_id = t.id
                WHERE UPPER(d.application_id) = $1""",
