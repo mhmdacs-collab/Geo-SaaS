@@ -111,6 +111,7 @@ app.add_middleware(
 TS_COLS = {"date_created", "date_updated", "stock_date"}
 DATE_COLS = {"doc_date", "due_date", "pay_date"}
 BOOL_COLS = {"is_enabled", "is_customer", "is_supplier", "is_tax_exempt", "is_price_change_allowed", "is_using_default_quantity", "is_service", "is_tax_inclusive_price"}
+INT_COLS = {"number"}
 
 _TS_FORMATS = (
     "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S",
@@ -184,6 +185,8 @@ def _coerce_row(pg_cols: List[str], values: List[Any]) -> List[Any]:
             out.append(_to_date(val))
         elif col in BOOL_COLS:
             out.append(_to_bool(val))
+        elif col in INT_COLS:
+            out.append(int(val) if val is not None and val != "" else None)
         else:
             out.append(val)
     return out
