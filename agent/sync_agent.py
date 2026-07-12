@@ -332,6 +332,8 @@ SYNC_MAP: List[SyncTable] = [
     {"name": "DocumentItemTax", "strategy": "child_of", "pk_composite": ["DocumentItemId","TaxId"], "parent_table": "DocumentItem", "parent_fk": "DocumentItemId", "cols": ["DocumentItemId","TaxId","Amount"]},
     {"name": "Payment", "strategy": "child_of", "pk": "Id", "parent_table": "Document", "parent_fk": "DocumentId",
      "cols": ["Id","DocumentId","PaymentTypeId","Amount","Date","UserId","ZReportId","DateCreated"]},
+    {"name": "ZReport", "strategy": "z_report_with_summary", "pk": "Id", "updated_col": "DateCreated",
+     "cols": ["Id","Number","FromDocumentId","ToDocumentId","DateCreated","TotalSales","TotalTax","TotalDiscount","CashAmount","CardAmount","TransferAmount","RefundAmount","DocumentCount"]},
     {"name": "PosOrder", "strategy": "incremental_updated", "pk": "Id", "updated_col": "DateCreated",
      "cols": ["Id","UserId","Number","Discount","DiscountType","Total","CustomerId","ServiceType","DateCreated"]},
     {"name": "PosOrderItem", "strategy": "child_of", "pk": "Id", "parent_table": "PosOrder", "parent_fk": "PosOrderId",
@@ -383,6 +385,9 @@ class ApiClient:
         h = {"Content-Type": "application/json", "User-Agent": f"aronium-agent/{VERSION}"}
         if self.token:
             h["Authorization"] = f"Bearer {self.token}"
+        app_id = _kv_get("application_id")
+        if app_id:
+            h["X-Application-Id"] = app_id
         return h
 
     def activate(self, application_id: str, tax_number: str, hostname: str) -> Dict[str, Any]:
@@ -460,6 +465,101 @@ def _sync_incremental_updated(snap, api, table, batch_size):
     payload = [_row_to_dict(r, cols) for r in rows]
     api.upsert(name, payload)
     new_cursor = max(str(r[updated_col]) for r in rows if r[updated_col] is not None)
+    if new_cursor:
+        _cursor_set(name, new_cursor)
+    logger.info(LOG["table_inc"].format(count=len(payload), table=name))
+    return len(payload)
+
+
+def _sync_z_report_with_summary(snap, api, table, batch_size):
+    """Sync ZReport with calculated summaries from Document/Payment tables."""
+    name = table["name"]
+    updated_col = table["updated_col"]
+    cursor = _cursor_get(name) or "1970-01-01 00:00:00"
+    
+    # Get new ZReports
+    z_reports = snap.execute(
+        f'SELECT Id, Number, FromDocumentId, ToDocumentId, DateCreated FROM "{name}" WHERE "{updated_col}" > ? ORDER BY "{updated_col}" ASC LIMIT ?',
+        (cursor, batch_size),
+    ).fetchall()
+    
+    if not z_reports:
+        return 0
+    
+    payload = []
+    for z in z_reports:
+        z_id, z_number, from_doc, to_doc, date_created = z
+        
+        # Calculate summaries for this ZReport range
+        if from_doc and to_doc and from_doc > 0:
+            # Total sales (ONLY Sales - DocumentTypeId=2)
+            total_sales = snap.execute(
+                'SELECT COALESCE(SUM(Total), 0) FROM Document WHERE Id >= ? AND Id <= ? AND DocumentTypeId = 2',
+                (from_doc, to_doc)
+            ).fetchone()[0]
+            
+            # Total tax (ONLY from Sales documents)
+            total_tax = snap.execute(
+                'SELECT COALESCE(SUM(Amount), 0) FROM DocumentItemTax WHERE DocumentItemId IN (SELECT Id FROM DocumentItem WHERE DocumentId >= ? AND DocumentId <= ? AND DocumentId IN (SELECT Id FROM Document WHERE DocumentTypeId = 2))',
+                (from_doc, to_doc)
+            ).fetchone()[0]
+            
+            # Total discount (ONLY from Sales documents)
+            total_discount = snap.execute(
+                'SELECT COALESCE(SUM(Discount), 0) FROM Document WHERE Id >= ? AND Id <= ? AND DocumentTypeId = 2',
+                (from_doc, to_doc)
+            ).fetchone()[0]
+            
+            # Payment amounts by type (ONLY from Sales documents)
+            cash_amount = snap.execute(
+                'SELECT COALESCE(SUM(Amount), 0) FROM Payment WHERE DocumentId >= ? AND DocumentId <= ? AND PaymentTypeId = 1 AND DocumentId IN (SELECT Id FROM Document WHERE DocumentTypeId = 2)',
+                (from_doc, to_doc)
+            ).fetchone()[0]
+            
+            card_amount = snap.execute(
+                'SELECT COALESCE(SUM(Amount), 0) FROM Payment WHERE DocumentId >= ? AND DocumentId <= ? AND PaymentTypeId = 2 AND DocumentId IN (SELECT Id FROM Document WHERE DocumentTypeId = 2)',
+                (from_doc, to_doc)
+            ).fetchone()[0]
+            
+            transfer_amount = snap.execute(
+                'SELECT COALESCE(SUM(Amount), 0) FROM Payment WHERE DocumentId >= ? AND DocumentId <= ? AND PaymentTypeId = 3 AND DocumentId IN (SELECT Id FROM Document WHERE DocumentTypeId = 2)',
+                (from_doc, to_doc)
+            ).fetchone()[0]
+            
+            # Refund amount (payments for refund documents - DocumentTypeId=4)
+            refund_amount = snap.execute(
+                'SELECT COALESCE(SUM(Amount), 0) FROM Payment WHERE DocumentId >= ? AND DocumentId <= ? AND DocumentId IN (SELECT Id FROM Document WHERE DocumentTypeId = 4)',
+                (from_doc, to_doc)
+            ).fetchone()[0]
+            
+            # Document count (ONLY Sales documents)
+            document_count = snap.execute(
+                'SELECT COUNT(*) FROM Document WHERE Id >= ? AND Id <= ? AND DocumentTypeId = 2',
+                (from_doc, to_doc)
+            ).fetchone()[0]
+        else:
+            total_sales = total_tax = total_discount = 0
+            cash_amount = card_amount = transfer_amount = refund_amount = 0
+            document_count = 0
+        
+        payload.append({
+            "Id": str(z_id),
+            "Number": z_number,
+            "FromDocumentId": str(from_doc) if from_doc else "0",
+            "ToDocumentId": str(to_doc) if to_doc else "0",
+            "DateCreated": date_created,
+            "TotalSales": float(total_sales),
+            "TotalTax": float(total_tax),
+            "TotalDiscount": float(total_discount),
+            "CashAmount": float(cash_amount),
+            "CardAmount": float(card_amount),
+            "TransferAmount": float(transfer_amount),
+            "RefundAmount": float(refund_amount),
+            "DocumentCount": document_count
+        })
+    
+    api.upsert(name, payload)
+    new_cursor = max(str(z[4]) for z in z_reports if z[4] is not None)
     if new_cursor:
         _cursor_set(name, new_cursor)
     logger.info(LOG["table_inc"].format(count=len(payload), table=name))
@@ -582,10 +682,17 @@ def ensure_activated(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
             logger.info(LOG["token_valid"])
             return
         except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code == 401:
+            code = e.response.status_code if e.response is not None else None
+            if code == 401:
                 logger.info(LOG["token_expired"])
                 _clear_token()
                 api.token = None
+            elif code in (403, 410):
+                # Subscription suspended/expired - keep the token (it will
+                # start working again automatically once renewed) and stop
+                # this cycle before any sync call is made.
+                logger.error(_friendly_http_error(e))
+                raise SubscriptionError(_friendly_http_error(e)) from e
             else:
                 raise
 
@@ -659,6 +766,9 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
             try:
                 if strategy == "incremental_updated":
                     n = _sync_incremental_updated(conn, api, table, cfg.batch_size)
+                    all_synced += n
+                elif strategy == "z_report_with_summary":
+                    n = _sync_z_report_with_summary(conn, api, table, cfg.batch_size)
                     all_synced += n
                 elif strategy == "hash_diff":
                     changed, total = _sync_hash_diff(conn, api, table)

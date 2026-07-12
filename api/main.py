@@ -218,7 +218,10 @@ class AgentCtx(BaseModel):
     device_id: str
 
 
-async def require_agent(authorization: str = Header(None)) -> AgentCtx:
+async def require_agent(
+    authorization: str = Header(None),
+    x_application_id: str = Header(None, alias="X-Application-Id"),
+) -> AgentCtx:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(401, "missing bearer token")
     token = authorization.split(None, 1)[1].strip()
@@ -241,7 +244,7 @@ async def require_agent(authorization: str = Header(None)) -> AgentCtx:
     async with app.state.pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            SELECT d.is_active, t.status, t.expires_at
+            SELECT d.is_active, d.application_id, t.status, t.expires_at
             FROM devices d
             JOIN tenants t ON t.id = d.tenant_id
             WHERE d.id=$1 AND d.tenant_id=$2
@@ -252,6 +255,16 @@ async def require_agent(authorization: str = Header(None)) -> AgentCtx:
         raise HTTPException(403, "device unknown")
     if not row["is_active"]:
         raise HTTPException(403, "device deactivated")
+    # Cross-validate the physical Aronium Application ID on every
+    # authenticated request (not just at activation time). The JWT alone
+    # only proves possession of the token file; if an attacker copies
+    # agent.token to a different machine (with a different Aronium
+    # Application ID), this check rejects the request even though the
+    # token itself is still cryptographically valid.
+    stored_app_id = (row["application_id"] or "").strip().upper()
+    sent_app_id = (x_application_id or "").strip().upper()
+    if not sent_app_id or sent_app_id != stored_app_id:
+        raise HTTPException(403, "device identity mismatch - application id does not match")
     # Enforce subscription status/expiry on every authenticated request,
     # not just at activation/heartbeat time. This prevents a bypassed or
     # custom client from continuing to sync data using a still-valid JWT
