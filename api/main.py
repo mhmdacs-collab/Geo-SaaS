@@ -597,8 +597,13 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
     tdef = validate_table(req.table)
     pg_table = tdef["pg_table"]
     pg_cols = list(tdef["columns"].values())
-    conflict_cols = ["tenant_id"] + tdef["conflict"]  # Always include tenant_id
-    all_cols = ["tenant_id"] + pg_cols
+    # tenant_id + device_id must BOTH be part of the conflict target. Each
+    # physical Aronium installation (device) generates its own auto-increment
+    # local IDs starting from 1, so two branches under the same tenant can
+    # easily share the same local "Id". Without device_id in the key, one
+    # branch's upsert would silently overwrite another branch's row.
+    conflict_cols = ["tenant_id", "device_id"] + tdef["conflict"]
+    all_cols = ["tenant_id", "device_id"] + pg_cols
     placeholders = ", ".join(f"${i+1}" for i in range(len(all_cols)))
     col_list = ", ".join(f'"{c}"' for c in all_cols)
     conflict_list = ", ".join(f'"{c}"' for c in conflict_cols)
@@ -622,7 +627,7 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
                 rows_to_write = []
                 for raw in req.rows:
                     values = list(_coerce_row(pg_cols, project_row(tdef, raw), pg_table))
-                    rows_to_write.append((ctx.tenant_id, *values))
+                    rows_to_write.append((ctx.tenant_id, ctx.device_id, *values))
                 await conn.executemany(sql, rows_to_write)
         return {"upserted": len(rows_to_write), "table": req.table}
     except Exception as e:
@@ -640,18 +645,23 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
     try:
         async with pool.acquire() as conn:
             async with conn.transaction():
+                # Scope deletion to THIS device only. Reconcile must never
+                # touch rows synced by another device under the same tenant
+                # (e.g. a branch's reconcile must not wipe the main store's
+                # documents/products just because they aren't in the
+                # branch's own local id list).
                 if not req.local_pks:
                     row = await conn.fetch(
-                        f"DELETE FROM {pg_table} WHERE tenant_id=$1 "
+                        f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
                         f"RETURNING {pk_text_expr} AS pk",
-                        ctx.tenant_id,
+                        ctx.tenant_id, ctx.device_id,
                     )
                 else:
                     row = await conn.fetch(
-                        f"DELETE FROM {pg_table} WHERE tenant_id=$1 "
-                        f"AND {pk_text_expr} <> ALL($2::text[]) "
+                        f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
+                        f"AND {pk_text_expr} <> ALL($3::text[]) "
                         f"RETURNING {pk_text_expr} AS pk",
-                        ctx.tenant_id, req.local_pks,
+                        ctx.tenant_id, ctx.device_id, req.local_pks,
                     )
                 deleted = [r["pk"] for r in row]
         if deleted:
