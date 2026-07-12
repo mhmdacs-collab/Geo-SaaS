@@ -258,6 +258,7 @@ class ActivateResp(BaseModel):
     store_name: str = ""
     tax_number: str = ""
     expires_at: str = ""
+    registered_at: str = ""
 
 
 class HeartbeatReq(BaseModel):
@@ -496,6 +497,7 @@ async def activate(req: ActivateReq, request: Request):
     token = _make_token(str(device["tenant_id"]), str(device["id"]))
 
     expires_at_str = device["expires_at"].isoformat() if device["expires_at"] else ""
+    registered_at_str = device["created_at"].isoformat() if device["created_at"] else ""
 
     log.info(
         "activated device=%s tenant=%s host=%s",
@@ -509,6 +511,7 @@ async def activate(req: ActivateReq, request: Request):
         store_name=device["store_name"] or "",
         tax_number=device["tax_number"] or "",
         expires_at=expires_at_str,
+        registered_at=registered_at_str,
     )
 
 
