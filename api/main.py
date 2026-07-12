@@ -360,6 +360,15 @@ TABLE_MAP = {
         },
         "conflict": ["id"],
     },
+    "ZReport": {
+        "pg_table": "z_report",
+        "columns": {
+            "Id": "id", "Number": "number",
+            "FromDocumentId": "from_document_id", "ToDocumentId": "to_document_id",
+            "DateCreated": "date_created",
+        },
+        "conflict": ["id"],
+    },
     "ProductGroup": {
         "pg_table": "product_group",
         "columns": {"Id": "id", "Name": "name"},
