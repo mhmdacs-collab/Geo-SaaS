@@ -240,13 +240,26 @@ async def require_agent(authorization: str = Header(None)) -> AgentCtx:
     # Verify device exists and is active
     async with app.state.pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT is_active FROM devices WHERE id=$1 AND tenant_id=$2",
+            """
+            SELECT d.is_active, t.status, t.expires_at
+            FROM devices d
+            JOIN tenants t ON t.id = d.tenant_id
+            WHERE d.id=$1 AND d.tenant_id=$2
+            """,
             device_id, tenant_id,
         )
     if row is None:
         raise HTTPException(403, "device unknown")
     if not row["is_active"]:
         raise HTTPException(403, "device deactivated")
+    # Enforce subscription status/expiry on every authenticated request,
+    # not just at activation/heartbeat time. This prevents a bypassed or
+    # custom client from continuing to sync data using a still-valid JWT
+    # after the tenant's subscription has been suspended or has expired.
+    if row["status"] != "active":
+        raise HTTPException(403, "subscription not active")
+    if row["expires_at"] and row["expires_at"] < datetime.now(timezone.utc):
+        raise HTTPException(410, "subscription expired")
     return AgentCtx(tenant_id=tenant_id, device_id=device_id)
 
 
