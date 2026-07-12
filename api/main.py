@@ -467,7 +467,7 @@ async def activate(req: ActivateReq, request: Request):
 
         # 4. Update device last seen
         await conn.execute(
-            """UPDATE devices SET hostname = $2, last_seen_at = now()
+            """UPDATE devices SET hostname = $2, last_seen = now()
                WHERE id = $1""",
             device["id"], hostname,
         )
@@ -510,7 +510,7 @@ async def heartbeat(req: HeartbeatReq, ctx: AgentCtx = Depends(require_agent)):
 
         # Update device last seen
         await conn.execute(
-            "UPDATE devices SET last_seen_at=now() WHERE id=$1 AND tenant_id=$2",
+            "UPDATE devices SET last_seen=now() WHERE id=$1 AND tenant_id=$2",
             ctx.device_id, ctx.tenant_id,
         )
     return {"ok": True}
