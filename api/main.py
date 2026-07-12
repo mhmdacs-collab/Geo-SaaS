@@ -525,12 +525,12 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
     tdef = validate_table(req.table)
     pg_table = tdef["pg_table"]
     pg_cols = list(tdef["columns"].values())
-    conflict_cols = tdef["conflict"]
+    conflict_cols = ["tenant_id"] + tdef["conflict"]  # Always include tenant_id
     all_cols = ["tenant_id"] + pg_cols
     placeholders = ", ".join(f"${i+1}" for i in range(len(all_cols)))
     col_list = ", ".join(f'"{c}"' for c in all_cols)
     conflict_list = ", ".join(f'"{c}"' for c in conflict_cols)
-    update_cols = [c for c in pg_cols if c not in conflict_cols]
+    update_cols = [c for c in pg_cols if c not in tdef["conflict"]]
 
     if update_cols:
         update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in update_cols)
