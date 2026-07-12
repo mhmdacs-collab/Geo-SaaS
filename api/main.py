@@ -111,7 +111,12 @@ app.add_middleware(
 TS_COLS = {"date_created", "date_updated", "stock_date"}
 DATE_COLS = {"doc_date", "due_date", "pay_date"}
 BOOL_COLS = {"is_enabled", "is_customer", "is_supplier", "is_tax_exempt", "is_price_change_allowed", "is_using_default_quantity", "is_service", "is_tax_inclusive_price"}
-INT_COLS = {"number"}
+# INT_COLS is scoped per pg_table because "number" is an integer only in
+# z_report, while it is a free-form text value (e.g. "26-200-000001") in
+# document / pos_order.
+INT_COLS_BY_TABLE = {
+    "z_report": {"number"},
+}
 
 _TS_FORMATS = (
     "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S",
@@ -176,7 +181,8 @@ def _to_bool(v: Any) -> Optional[bool]:
     return None
 
 
-def _coerce_row(pg_cols: List[str], values: List[Any]) -> List[Any]:
+def _coerce_row(pg_cols: List[str], values: List[Any], pg_table: str = "") -> List[Any]:
+    int_cols = INT_COLS_BY_TABLE.get(pg_table, set())
     out: List[Any] = []
     for col, val in zip(pg_cols, values):
         if col in TS_COLS:
@@ -185,7 +191,7 @@ def _coerce_row(pg_cols: List[str], values: List[Any]) -> List[Any]:
             out.append(_to_date(val))
         elif col in BOOL_COLS:
             out.append(_to_bool(val))
-        elif col in INT_COLS:
+        elif col in int_cols:
             out.append(int(val) if val is not None and val != "" else None)
         else:
             out.append(val)
@@ -589,7 +595,7 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
             async with conn.transaction():
                 rows_to_write = []
                 for raw in req.rows:
-                    values = list(_coerce_row(pg_cols, project_row(tdef, raw)))
+                    values = list(_coerce_row(pg_cols, project_row(tdef, raw), pg_table))
                     rows_to_write.append((ctx.tenant_id, *values))
                 await conn.executemany(sql, rows_to_write)
         return {"upserted": len(rows_to_write), "table": req.table}
