@@ -21,6 +21,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+import portal
+
 # ────────────────────────────────────────────────────────────────────────────
 # Config
 # ────────────────────────────────────────────────────────────────────────────
@@ -31,6 +33,7 @@ JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "aronium-agent")
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "")
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
 JWT_TTL_DAYS = int(os.environ.get("JWT_TTL_DAYS", "365"))
+SUPPORT_WA = os.environ.get("SUPPORT_WA", "966558110150")
 
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL env var is required")
@@ -90,6 +93,9 @@ async def lifespan(app: FastAPI):
     app.state.pool = await asyncpg.create_pool(
         dsn=_clean_dsn(DATABASE_URL), min_size=1, max_size=10, command_timeout=60,
     )
+    app.state.jwt_secret = JWT_SECRET
+    app.state.jwt_alg = JWT_ALG
+    app.state.support_wa = SUPPORT_WA
     log.info("DB pool ready")
     try:
         yield
@@ -103,6 +109,7 @@ app.add_middleware(
     CORSMiddleware, allow_origins=CORS_ORIGINS,
     allow_methods=["GET", "POST"], allow_headers=["*"],
 )
+app.include_router(portal.router)
 
 
 # ────────────────────────────────────────────────────────────────────────────

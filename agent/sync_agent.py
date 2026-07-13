@@ -47,7 +47,7 @@ STATE_DB = os.path.join(BASE_DIR, "agent_state.db")
 TOKEN_FILE = os.path.join(BASE_DIR, "agent.token")
 LOG_FILE = os.path.join(BASE_DIR, "agent.log")
 
-VERSION = "12.1.0"
+VERSION = "12.2.0"
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
 logger = logging.getLogger("aronium-agent")
@@ -59,7 +59,7 @@ logger.addHandler(_fh)
 
 # ─── Log Messages ────────────────────────────────────────────────────────────
 LOG = {
-    "start":          "Aronium Agent v12.1 started | server={url}",
+    "start":          "Aronium Agent v12.2 started | server={url}",
     "shutdown":       "Agent stopped by user",
     "activating":     "Activating device...",
     "activated":      "Activation successful | store={store} tax={tax}",
@@ -867,6 +867,17 @@ def main() -> None:
         if not snap:
             time.sleep(cfg.sync_interval_sec)
             continue
+
+        # Always refresh the cached application_id from the local Aronium DB
+        # before any authenticated request. This prevents a false-positive
+        # 403 "identity mismatch" if agent_state.db was ever recreated/lost
+        # while agent.token (which skips re-activation) still exists.
+        try:
+            fresh_app_id = read_device_info(snap).get("application_id")
+            if fresh_app_id:
+                _kv_set("application_id", fresh_app_id)
+        except Exception:
+            pass
 
         try:
             ensure_activated(cfg, api, snap)

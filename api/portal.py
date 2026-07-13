@@ -4,6 +4,10 @@ Aronium SaaS - Portal API
 Merchant dashboard endpoints (read-only + settings).
 Requires passlib + bcrypt (added in requirements.txt).
 
+Data model reminder: ONE tenant row = one merchant (unique tax_number).
+A merchant can have MANY devices (branches), each with its own
+application_id. "Branch" in this API always maps to a devices.id row.
+
 Router prefix: /api/portal
 """
 from __future__ import annotations
@@ -21,10 +25,10 @@ from passlib.hash import bcrypt
 
 log = logging.getLogger("ingest")
 
-SALES = 2
-REFUND = 4
-PURCHASE = 1
-STOCK_RETURN = 5
+SALES = "2"
+REFUND = "4"
+PURCHASE = "1"
+STOCK_RETURN = "5"
 
 _LOGIN_HITS: Dict[str, deque] = defaultdict(deque)
 _LOGIN_WINDOW = 60.0
@@ -60,10 +64,10 @@ def to_d(row):
 router = APIRouter(prefix="/api/portal")
 
 
-def _make_portal_token(tenant_ids, tax, store, close_hour=0, onboarded=False, jwt_secret="", jwt_alg="HS256"):
+def _make_portal_token(tenant_id, tax, store, close_hour=0, onboarded=False, jwt_secret="", jwt_alg="HS256"):
     return jwt.encode({
         "sub": "portal",
-        "tenant_ids": tenant_ids,
+        "tenant_id": str(tenant_id),
         "tax": tax,
         "store": store,
         "close_hour": close_hour,
@@ -87,11 +91,15 @@ async def _require_portal(authorization=None, jwt_secret="", jwt_alg=""):
     return payload
 
 
-def _get_tids(auth, req_tenant=None):
-    all_ids = auth.get("tenant_ids", [])
-    if req_tenant and req_tenant in all_ids:
-        return [req_tenant]
-    return all_ids
+def _scope(auth, branch_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
+    """Return (tenant_id, device_id_or_None) used to scope every query.
+
+    device_id stays None when no specific branch was requested, meaning
+    "all branches of this tenant". Passing a device_id that does not
+    belong to this tenant simply yields an empty result set (tenant_id
+    is always enforced as well), so there is no cross-tenant leak risk.
+    """
+    return auth.get("tenant_id"), branch_id
 
 
 def _period_bounds(close_hour, offset=0):
@@ -103,7 +111,7 @@ def _period_bounds(close_hour, offset=0):
     return current_close + timedelta(days=offset), current_close + timedelta(days=offset + 1)
 
 
-async def _verify_password(conn, stored, pwd, tax):
+async def _verify_password(conn, stored, pwd, tenant_id):
     stored = (stored or "").strip()
     if not stored:
         return False
@@ -115,7 +123,7 @@ async def _verify_password(conn, stored, pwd, tax):
     if stored == pwd:
         try:
             new_hash = bcrypt.hash(pwd)
-            await conn.execute("UPDATE tenants SET custom_password=$1 WHERE tax_number=$2", new_hash, tax)
+            await conn.execute("UPDATE tenants SET custom_password=$1 WHERE id=$2", new_hash, tenant_id)
         except Exception:
             pass
         return True
@@ -143,53 +151,56 @@ async def portal_login(body: dict, request: Request):
 
     pool = state.pool
     async with pool.acquire() as conn:
-        rows = await conn.fetch("""
-            SELECT DISTINCT ON (t.id)
-                t.id AS tenant_id, t.store_name, t.tax_number, t.phone_number,
-                t.application_id,
-                COALESCE(t.close_hour, 0) AS close_hour,
-                COALESCE(t.onboarded, false) AS onboarded,
-                COALESCE(t.custom_password, t.phone_number) AS active_password,
-                COALESCE(t.subscription_status, 'active') AS sub_status
-            FROM tenants t
-            WHERE t.tax_number = $1
-            ORDER BY t.id
+        tenant = await conn.fetchrow("""
+            SELECT id AS tenant_id, store_name, tax_number, phone_number,
+                   COALESCE(close_hour, 0) AS close_hour,
+                   COALESCE(onboarded, false) AS onboarded,
+                   COALESCE(custom_password, phone_number) AS active_password,
+                   COALESCE(status, 'active') AS sub_status
+            FROM tenants WHERE tax_number = $1
         """, tax)
-        if not rows:
+        if not tenant:
             raise HTTPException(401, "Tax number not registered")
-        first = rows[0]
-        if first["sub_status"] not in ("active", "", None):
+        if tenant["sub_status"] not in ("active", "", None):
             raise HTTPException(403, "Subscription inactive")
-        ok = await _verify_password(conn, first["active_password"], pwd, tax)
+        ok = await _verify_password(conn, tenant["active_password"], pwd, tenant["tenant_id"])
         if not ok:
             raise HTTPException(401, "Incorrect password")
 
-        tenant_ids = [str(r["tenant_id"]) for r in rows]
-        close_hour = int(first["close_hour"] or 0)
-        onboarded = bool(first["onboarded"])
+        tenant_id = str(tenant["tenant_id"])
+        close_hour = int(tenant["close_hour"] or 0)
+        onboarded = bool(tenant["onboarded"])
+
+        devices = await conn.fetch("""
+            SELECT id AS device_id, branch_name, branch_type, is_active
+            FROM devices WHERE tenant_id = $1 ORDER BY registered_at
+        """, tenant["tenant_id"])
+
         start, end = _period_bounds(close_hour, 0)
         sales_rows = await conn.fetch("""
-            SELECT tenant_id, COALESCE(SUM(total), 0) AS total
-            FROM ar_documents
-            WHERE tenant_id = ANY($1::uuid[])
+            SELECT device_id, COALESCE(SUM(total), 0) AS total
+            FROM document
+            WHERE tenant_id = $1
               AND date_created >= $2 AND date_created < $3
               AND document_type_id = $4
-            GROUP BY tenant_id
-        """, tenant_ids, start, end, SALES)
-        sales_map = {str(r["tenant_id"]): float(r["total"]) for r in sales_rows}
+            GROUP BY device_id
+        """, tenant["tenant_id"], start, end, SALES)
+        sales_map = {str(r["device_id"]): float(r["total"]) for r in sales_rows}
 
     branches = [{
-        "tenant_id": str(r["tenant_id"]),
-        "store_name": r["store_name"] or "Branch",
-        "today_sales": sales_map.get(str(r["tenant_id"]), 0.0),
-    } for r in rows]
+        "device_id": str(d["device_id"]),
+        "branch_name": d["branch_name"] or "Branch",
+        "branch_type": d["branch_type"],
+        "is_active": d["is_active"],
+        "today_sales": sales_map.get(str(d["device_id"]), 0.0),
+    } for d in devices]
 
     token = _make_portal_token(
-        tenant_ids, tax, first["store_name"] or "", close_hour, onboarded,
+        tenant_id, tax, tenant["store_name"] or "", close_hour, onboarded,
         jwt_secret=state.jwt_secret, jwt_alg=state.jwt_alg,
     )
     return {
-        "token": token, "store_name": first["store_name"] or "",
+        "token": token, "store_name": tenant["store_name"] or "",
         "tax_number": tax, "close_hour": close_hour, "onboarded": onboarded,
         "branches": branches,
         "support_wa": getattr(state, "support_wa", "966558110150"),
@@ -207,8 +218,7 @@ async def portal_change_password(body: dict, request: Request):
     hashed = bcrypt.hash(new_pwd)
     pool = state.pool
     async with pool.acquire() as conn:
-        for tid in auth.get("tenant_ids", []):
-            await conn.execute("UPDATE tenants SET custom_password = $1 WHERE id = $2", hashed, tid)
+        await conn.execute("UPDATE tenants SET custom_password = $1 WHERE id = $2", hashed, auth.get("tenant_id"))
     return {"success": True}
 
 
@@ -222,10 +232,9 @@ async def portal_set_close_hour(body: dict, request: Request):
         raise HTTPException(400, "Invalid hour")
     pool = state.pool
     async with pool.acquire() as conn:
-        for tid in auth.get("tenant_ids", []):
-            await conn.execute("UPDATE tenants SET close_hour = $1, onboarded = true WHERE id = $2", hour, tid)
+        await conn.execute("UPDATE tenants SET close_hour = $1, onboarded = true WHERE id = $2", hour, auth.get("tenant_id"))
     new_token = _make_portal_token(
-        auth.get("tenant_ids", []), auth.get("tax", ""), auth.get("store", ""),
+        auth.get("tenant_id"), auth.get("tax", ""), auth.get("store", ""),
         close_hour=hour, onboarded=True,
         jwt_secret=state.jwt_secret, jwt_alg=state.jwt_alg,
     )
@@ -238,30 +247,30 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
     state = request.app.state
     auth = await _get_auth(request)
     close_hour = int(auth.get("close_hour", 0))
-    tids = _get_tids(auth, tenant_id)
+    tid, did = _scope(auth, tenant_id)
     start, end = _period_bounds(close_hour, offset)
     pool = state.pool
 
     async with pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT document_type_id, COALESCE(SUM(total), 0) AS total, COUNT(*) AS cnt
-            FROM ar_documents
-            WHERE tenant_id = ANY($1::uuid[])
-              AND date_created >= $2 AND date_created < $3
-              AND document_type_id = ANY($4::int[])
+            FROM document
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND date_created >= $3 AND date_created < $4
+              AND document_type_id = ANY($5::text[])
             GROUP BY document_type_id
-        """, tids, start, end, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+        """, tid, did, start, end, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
         pay_rows = await conn.fetch("""
             SELECT pt.name AS pay_name, COALESCE(SUM(p.amount), 0) AS total
-            FROM ar_payments p
-            JOIN ar_documents d ON d.aronium_id = p.document_id AND d.tenant_id = p.tenant_id
-            JOIN ar_payment_types pt ON pt.aronium_id = p.payment_type_id AND pt.tenant_id = p.tenant_id
-            WHERE p.tenant_id = ANY($1::uuid[])
-              AND d.date_created >= $2 AND d.date_created < $3
-              AND d.document_type_id = $4
+            FROM payment p
+            JOIN document d ON d.id = p.document_id AND d.tenant_id = p.tenant_id AND d.device_id = p.device_id
+            JOIN payment_type pt ON pt.id = p.payment_type_id AND pt.tenant_id = p.tenant_id AND pt.device_id = p.device_id
+            WHERE p.tenant_id = $1::uuid AND ($2::uuid IS NULL OR p.device_id = $2::uuid)
+              AND d.date_created >= $3 AND d.date_created < $4
+              AND d.document_type_id = $5
             GROUP BY pt.name
-        """, tids, start, end, SALES)
+        """, tid, did, start, end, SALES)
 
     sales = refund = purchases = stock_return = 0.0
     cnt_s = cnt_p = cnt_sr = 0
@@ -285,39 +294,50 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
 
 
 # === MONTH / QUARTER ===
-async def _period_data(pool, tids, period):
+async def _period_data(pool, tid, did, period):
     trunc = "month" if period == "month" else "quarter"
     async with pool.acquire() as conn:
         rows = await conn.fetch(f"""
             SELECT document_type_id, COALESCE(SUM(total), 0) AS total, COUNT(*) AS cnt
-            FROM ar_documents
-            WHERE tenant_id = ANY($1::uuid[])
+            FROM document
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
               AND DATE_TRUNC('{trunc}', doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-              AND document_type_id = ANY($2::int[])
+              AND document_type_id = ANY($3::text[])
             GROUP BY document_type_id
-        """, tids, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+        """, tid, did, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
         tax_rows = await conn.fetch(f"""
             SELECT d.document_type_id, COALESCE(SUM(dt.amount), 0) AS tax_total
-            FROM ar_document_item_taxes dt
-            JOIN ar_document_items di ON di.aronium_id = dt.document_item_id AND di.tenant_id = dt.tenant_id
-            JOIN ar_documents d ON d.aronium_id = di.document_id AND d.tenant_id = di.tenant_id
-            WHERE dt.tenant_id = ANY($1::uuid[])
+            FROM document_item_tax dt
+            JOIN document_item di ON di.id = dt.document_item_id AND di.tenant_id = dt.tenant_id AND di.device_id = dt.device_id
+            JOIN document d ON d.id = di.document_id AND d.tenant_id = di.tenant_id AND d.device_id = di.device_id
+            WHERE dt.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dt.device_id = $2::uuid)
               AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-              AND d.document_type_id = ANY($2::int[])
+              AND d.document_type_id = ANY($3::text[])
             GROUP BY d.document_type_id
-        """, tids, [SALES, REFUND, PURCHASE])
+        """, tid, did, [SALES, REFUND, PURCHASE])
 
         pay_rows = await conn.fetch(f"""
             SELECT pt.name AS pay_name, COALESCE(SUM(p.amount), 0) AS total
-            FROM ar_payments p
-            JOIN ar_documents d ON d.aronium_id = p.document_id AND d.tenant_id = p.tenant_id
-            JOIN ar_payment_types pt ON pt.aronium_id = p.payment_type_id AND pt.tenant_id = p.tenant_id
-            WHERE p.tenant_id = ANY($1::uuid[])
+            FROM payment p
+            JOIN document d ON d.id = p.document_id AND d.tenant_id = p.tenant_id AND d.device_id = p.device_id
+            JOIN payment_type pt ON pt.id = p.payment_type_id AND pt.tenant_id = p.tenant_id AND pt.device_id = p.device_id
+            WHERE p.tenant_id = $1::uuid AND ($2::uuid IS NULL OR p.device_id = $2::uuid)
+              AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+              AND d.document_type_id = $3
+            GROUP BY pt.name
+        """, tid, did, SALES)
+
+        branch_rows = await conn.fetch(f"""
+            SELECT d.device_id, dev.branch_name, COALESCE(SUM(d.total), 0) AS total
+            FROM document d
+            JOIN devices dev ON dev.id = d.device_id
+            WHERE d.tenant_id = $1::uuid
               AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
               AND d.document_type_id = $2
-            GROUP BY pt.name
-        """, tids, SALES)
+            GROUP BY d.device_id, dev.branch_name
+            ORDER BY total DESC
+        """, tid, SALES)
 
     sales = refund = purchases = 0.0
     tax_s = tax_r = tax_p = 0.0
@@ -356,6 +376,7 @@ async def _period_data(pool, tids, period):
         "tax_purchases": round(tax_p, 2),
         "vat_due": round((tax_s - tax_r) - tax_p, 2),
         "payment_breakdown": {r["pay_name"]: round(n(r["total"]), 2) for r in pay_rows},
+        "branch_breakdown": [{"device_id": str(r["device_id"]), "branch_name": r["branch_name"], "total": round(n(r["total"]), 2)} for r in branch_rows],
         "quarter_progress": progress, "days_remaining": days_remaining,
         "period_label": q_label if q_label else date.today().strftime("%B %Y"),
     }
@@ -364,13 +385,15 @@ async def _period_data(pool, tids, period):
 @router.get("/month")
 async def portal_month(request: Request, tenant_id: Optional[str] = None):
     auth = await _get_auth(request)
-    return await _period_data(request.app.state.pool, _get_tids(auth, tenant_id), "month")
+    tid, did = _scope(auth, tenant_id)
+    return await _period_data(request.app.state.pool, tid, did, "month")
 
 
 @router.get("/quarter")
 async def portal_quarter(request: Request, tenant_id: Optional[str] = None):
     auth = await _get_auth(request)
-    return await _period_data(request.app.state.pool, _get_tids(auth, tenant_id), "quarter")
+    tid, did = _scope(auth, tenant_id)
+    return await _period_data(request.app.state.pool, tid, did, "quarter")
 
 
 # === QUARTER DETAILS ===
@@ -378,7 +401,7 @@ async def portal_quarter(request: Request, tenant_id: Optional[str] = None):
 async def portal_quarter_details(request: Request, tenant_id: Optional[str] = None):
     state = request.app.state
     auth = await _get_auth(request)
-    tids = _get_tids(auth, tenant_id)
+    tid, did = _scope(auth, tenant_id)
     pool = state.pool
     today = date.today()
     qm = ((today.month - 1) // 3) * 3 + 1
@@ -392,27 +415,27 @@ async def portal_quarter_details(request: Request, tenant_id: Optional[str] = No
             SELECT DATE_TRUNC('month', doc_date::date) AS month,
                    document_type_id,
                    COALESCE(SUM(total), 0) AS total
-            FROM ar_documents
-            WHERE tenant_id = ANY($1::uuid[])
-              AND doc_date::date >= $2 AND doc_date::date <= $3
-              AND document_type_id = ANY($4::int[])
+            FROM document
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND doc_date::date >= $3 AND doc_date::date <= $4
+              AND document_type_id = ANY($5::text[])
             GROUP BY month, document_type_id
             ORDER BY month
-        """, tids, q_start, q_end, [SALES, REFUND, PURCHASE])
+        """, tid, did, q_start, q_end, [SALES, REFUND, PURCHASE])
 
         tax_rows = await conn.fetch("""
             SELECT DATE_TRUNC('month', d.doc_date::date) AS month,
                    d.document_type_id,
                    COALESCE(SUM(dt.amount), 0) AS tax_total
-            FROM ar_document_item_taxes dt
-            JOIN ar_document_items di ON di.aronium_id = dt.document_item_id AND di.tenant_id = dt.tenant_id
-            JOIN ar_documents d ON d.aronium_id = di.document_id AND d.tenant_id = di.tenant_id
-            WHERE dt.tenant_id = ANY($1::uuid[])
-              AND d.doc_date::date >= $2 AND d.doc_date::date <= $3
-              AND d.document_type_id = ANY($4::int[])
+            FROM document_item_tax dt
+            JOIN document_item di ON di.id = dt.document_item_id AND di.tenant_id = dt.tenant_id AND di.device_id = dt.device_id
+            JOIN document d ON d.id = di.document_id AND d.tenant_id = di.tenant_id AND d.device_id = di.device_id
+            WHERE dt.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dt.device_id = $2::uuid)
+              AND d.doc_date::date >= $3 AND d.doc_date::date <= $4
+              AND d.document_type_id = ANY($5::text[])
             GROUP BY month, d.document_type_id
             ORDER BY month
-        """, tids, q_start, q_end, [SALES, REFUND, PURCHASE])
+        """, tid, did, q_start, q_end, [SALES, REFUND, PURCHASE])
 
     monthly = {}
     for r in rows:
@@ -457,7 +480,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
     state = request.app.state
     auth = await _get_auth(request)
     close_hour = int(auth.get("close_hour", 0))
-    tids = _get_tids(auth, tenant_id)
+    tid, did = _scope(auth, tenant_id)
     start, end = _period_bounds(close_hour, offset)
     pool = state.pool
 
@@ -465,39 +488,49 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
         sales = await conn.fetch("""
             SELECT d.number AS invoice_number, d.date_created AS invoice_date,
                    d.total AS total_with_tax, pt.name AS payment_method
-            FROM ar_documents d
-            LEFT JOIN ar_payments p ON p.document_id = d.aronium_id AND p.tenant_id = d.tenant_id
-            LEFT JOIN ar_payment_types pt ON pt.aronium_id = p.payment_type_id AND pt.tenant_id = p.tenant_id
-            WHERE d.tenant_id = ANY($1::uuid[])
-              AND d.date_created >= $2 AND d.date_created < $3
-              AND d.document_type_id = $4
+            FROM document d
+            LEFT JOIN payment p ON p.document_id = d.id AND p.tenant_id = d.tenant_id AND p.device_id = d.device_id
+            LEFT JOIN payment_type pt ON pt.id = p.payment_type_id AND pt.tenant_id = p.tenant_id AND pt.device_id = p.device_id
+            WHERE d.tenant_id = $1::uuid AND ($2::uuid IS NULL OR d.device_id = $2::uuid)
+              AND d.date_created >= $3 AND d.date_created < $4
+              AND d.document_type_id = $5
             ORDER BY d.date_created DESC LIMIT 10
-        """, tids, start, end, SALES)
+        """, tid, did, start, end, SALES)
 
         refunds = await conn.fetch("""
             SELECT number AS invoice_number, date_created AS invoice_date, total AS total_with_tax
-            FROM ar_documents
-            WHERE tenant_id = ANY($1::uuid[])
-              AND date_created >= $2 AND date_created < $3
-              AND document_type_id = $4
+            FROM document
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND date_created >= $3 AND date_created < $4
+              AND document_type_id = $5
             ORDER BY date_created DESC LIMIT 5
-        """, tids, start, end, REFUND)
+        """, tid, did, start, end, REFUND)
 
         purchases = await conn.fetch("""
             SELECT d.number AS invoice_number, d.date_created AS invoice_date,
                    d.total AS total_with_tax, c.name AS supplier_name
-            FROM ar_documents d
-            LEFT JOIN ar_customers c ON c.aronium_id = d.customer_id AND c.tenant_id = d.tenant_id
-            WHERE d.tenant_id = ANY($1::uuid[])
-              AND d.date_created >= $2 AND d.date_created < $3
-              AND d.document_type_id = $4
+            FROM document d
+            LEFT JOIN customer c ON c.id = d.customer_id AND c.tenant_id = d.tenant_id AND c.device_id = d.device_id
+            WHERE d.tenant_id = $1::uuid AND ($2::uuid IS NULL OR d.device_id = $2::uuid)
+              AND d.date_created >= $3 AND d.date_created < $4
+              AND d.document_type_id = $5
             ORDER BY d.date_created DESC LIMIT 5
-        """, tids, start, end, PURCHASE)
+        """, tid, did, start, end, PURCHASE)
+
+        stock_returns = await conn.fetch("""
+            SELECT number AS invoice_number, date_created AS invoice_date, total AS total_with_tax
+            FROM document
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND date_created >= $3 AND date_created < $4
+              AND document_type_id = $5
+            ORDER BY date_created DESC LIMIT 5
+        """, tid, did, start, end, STOCK_RETURN)
 
     return {
         "sales": [to_d(r) for r in sales],
         "refunds": [to_d(r) for r in refunds],
         "purchases": [to_d(r) for r in purchases],
+        "stock_returns": [to_d(r) for r in stock_returns],
     }
 
 
@@ -506,15 +539,28 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
 async def portal_sync_status(request: Request, tenant_id: Optional[str] = None):
     state = request.app.state
     auth = await _get_auth(request)
-    tids = _get_tids(auth, tenant_id)
+    tid, did = _scope(auth, tenant_id)
     pool = state.pool
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
             SELECT MAX(date_created) AS last_doc_date, COUNT(*) AS total_invoices
-            FROM ar_documents WHERE tenant_id = ANY($1::uuid[])
-        """, tids)
+            FROM document WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+        """, tid, did)
+        devices = await conn.fetch("""
+            SELECT id AS device_id, branch_name, is_active, last_seen
+            FROM devices WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR id = $2::uuid)
+            ORDER BY registered_at
+        """, tid, did)
     last = row["last_doc_date"]
-    return {"last_doc_date": last.isoformat() if last else None, "total_invoices": row["total_invoices"] or 0}
+    return {
+        "last_doc_date": last.isoformat() if last else None,
+        "total_invoices": row["total_invoices"] or 0,
+        "devices": [{
+            "device_id": str(d["device_id"]), "branch_name": d["branch_name"],
+            "is_active": d["is_active"],
+            "last_seen": d["last_seen"].isoformat() if d["last_seen"] else None,
+        } for d in devices],
+    }
 
 
 # === CLIENT INFO ===
@@ -522,20 +568,19 @@ async def portal_sync_status(request: Request, tenant_id: Optional[str] = None):
 async def portal_client(request: Request):
     state = request.app.state
     auth = await _get_auth(request)
-    tids = auth.get("tenant_ids", [])
-    if not tids:
+    tid = auth.get("tenant_id")
+    if not tid:
         return {}
     pool = state.pool
     async with pool.acquire() as conn:
         row = await conn.fetchrow("""
             SELECT t.store_name, t.tax_number, t.phone_number,
-                   t.application_id,
                    COALESCE(t.close_hour, 0) AS close_hour,
                    COALESCE(t.onboarded, false) AS onboarded,
-                   COALESCE(t.subscription_status, 'active') AS sub_status,
-                   t.subscription_expires_at
+                   COALESCE(t.status, 'active') AS sub_status,
+                   t.expires_at
             FROM tenants t WHERE t.id = $1
-        """, tids[0])
+        """, tid)
     if not row:
         return {}
     return {
@@ -545,5 +590,5 @@ async def portal_client(request: Request):
         "close_hour": int(row["close_hour"]),
         "onboarded": bool(row["onboarded"]),
         "sub_status": row["sub_status"],
-        "sub_expires": row["subscription_expires_at"].isoformat() if row["subscription_expires_at"] else None,
+        "sub_expires": row["expires_at"].isoformat() if row["expires_at"] else None,
     }
