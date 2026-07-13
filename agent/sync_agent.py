@@ -454,6 +454,14 @@ class SubscriptionError(Exception):
 
 def _friendly_http_error(e: requests.HTTPError) -> str:
     code = e.response.status_code if e.response is not None else None
+    detail = None
+    if e.response is not None:
+        try:
+            detail = e.response.json().get("detail")
+        except Exception:
+            detail = None
+    if detail:
+        return f"{detail} ({code})"
     if code in HTTP_ERROR_MAP:
         return HTTP_ERROR_MAP[code]
     return LOG["err_server"].format(code=code)
@@ -698,10 +706,10 @@ def ensure_activated(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
                 _clear_token()
                 api.token = None
             elif code in (403, 410):
-                # Subscription suspended/expired - keep the token (it will
-                # start working again automatically once renewed) and stop
-                # this cycle before any sync call is made.
-                logger.error(_friendly_http_error(e))
+                # Subscription/device issue - keep the token (it will start
+                # working again automatically once resolved) and stop this
+                # cycle before any sync call is made. Logged once by the
+                # outer SubscriptionError handler with the real reason.
                 raise SubscriptionError(_friendly_http_error(e)) from e
             else:
                 raise
@@ -809,9 +817,9 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
                     n = _sync_child_of(conn, api, table, parent_ids)
                     all_synced += n
             except requests.HTTPError as he:
-                logger.error(_friendly_http_error(he))
                 if he.response is not None and he.response.status_code == 401:
-                    raise SubscriptionError("subscription expired")
+                    raise SubscriptionError(_friendly_http_error(he)) from he
+                logger.error(_friendly_http_error(he))
             except SubscriptionError:
                 raise
             except Exception as e:
@@ -830,8 +838,7 @@ def run_reconcile_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> Non
                 _reconcile_table(conn, api, table)
             except requests.HTTPError as he:
                 if he.response is not None and he.response.status_code == 401:
-                    logger.error(LOG["sub_expired"])
-                    raise SubscriptionError("subscription expired")
+                    raise SubscriptionError(_friendly_http_error(he)) from he
                 logger.error(_friendly_http_error(he))
             except Exception as e:
                 logger.error(LOG["err_cycle"].format(reason=str(e)))
@@ -886,8 +893,8 @@ def main() -> None:
             except Exception as e:
                 logger.warning(LOG["heartbeat_fail"].format(reason=str(e)))
 
-        except SubscriptionError:
-            logger.error(LOG["sub_expired"])
+        except SubscriptionError as e:
+            logger.error(str(e) or LOG["sub_expired"])
             time.sleep(300)
         except Exception as e:
             logger.error(LOG["err_cycle"].format(reason=str(e)))
