@@ -116,6 +116,7 @@ BOOL_COLS = {"is_enabled", "is_customer", "is_supplier", "is_tax_exempt", "is_pr
 # document / pos_order.
 INT_COLS_BY_TABLE = {
     "z_report": {"number"},
+    "starting_cash": {"starting_cash_type"},
 }
 
 _TS_FORMATS = (
