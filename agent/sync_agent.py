@@ -47,7 +47,7 @@ STATE_DB = os.path.join(BASE_DIR, "agent_state.db")
 TOKEN_FILE = os.path.join(BASE_DIR, "agent.token")
 LOG_FILE = os.path.join(BASE_DIR, "agent.log")
 
-VERSION = "12.0.0"
+VERSION = "12.1.0"
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
 logger = logging.getLogger("aronium-agent")
@@ -59,7 +59,7 @@ logger.addHandler(_fh)
 
 # ─── Log Messages ────────────────────────────────────────────────────────────
 LOG = {
-    "start":          "Aronium Agent v12.0 started | server={url}",
+    "start":          "Aronium Agent v12.1 started | server={url}",
     "shutdown":       "Agent stopped by user",
     "activating":     "Activating device...",
     "activated":      "Activation successful | store={store} tax={tax}",
@@ -340,6 +340,16 @@ SYNC_MAP: List[SyncTable] = [
      "cols": ["Id","PosOrderId","ProductId","RoundNumber","Quantity","Price","IsLocked","Discount","DiscountType","IsFeatured","VoidedBy","Comment","DateCreated","Bundle","DiscountAppliedType"]},
     {"name": "LoyaltyCard", "strategy": "hash_diff", "pk": "Id", "cols": ["Id","CustomerId","CardNumber"]},
     {"name": "CustomerDiscount", "strategy": "hash_diff", "pk": "Id", "cols": ["Id","CustomerId","Type","Uid","Value"]},
+
+    # ─── Reference/Transaction Data (added: tax rates, product-tax link,
+    #     document categories, cash drawer starting/withdrawal amounts) ────
+    {"name": "Tax", "strategy": "hash_diff", "pk": "Id",
+     "cols": ["Id","Name","Rate","Code","IsFixed","IsTaxOnTotal","IsEnabled"]},
+    {"name": "ProductTax", "strategy": "hash_diff", "pk_composite": ["ProductId","TaxId"],
+     "cols": ["ProductId","TaxId"]},
+    {"name": "DocumentCategory", "strategy": "hash_diff", "pk": "Id", "cols": ["Id","Name","LanguageKey"]},
+    {"name": "StartingCash", "strategy": "incremental_updated", "pk": "Id", "updated_col": "DateCreated",
+     "cols": ["Id","UserId","Amount","Description","StartingCashType","ZReportNumber","DateCreated"]},
 ]
 
 

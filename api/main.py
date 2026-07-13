@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI):
         log.info("DB pool closed")
 
 
-app = FastAPI(title="Aronium Sync API", version="12.0.0", lifespan=lifespan)
+app = FastAPI(title="Aronium Sync API", version="12.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware, allow_origins=CORS_ORIGINS,
     allow_methods=["GET", "POST"], allow_headers=["*"],
@@ -110,7 +110,7 @@ app.add_middleware(
 # ────────────────────────────────────────────────────────────────────────────
 TS_COLS = {"date_created", "date_updated", "stock_date"}
 DATE_COLS = {"doc_date", "due_date", "pay_date"}
-BOOL_COLS = {"is_enabled", "is_customer", "is_supplier", "is_tax_exempt", "is_price_change_allowed", "is_using_default_quantity", "is_service", "is_tax_inclusive_price"}
+BOOL_COLS = {"is_enabled", "is_customer", "is_supplier", "is_tax_exempt", "is_price_change_allowed", "is_using_default_quantity", "is_service", "is_tax_inclusive_price", "is_fixed", "is_tax_on_total"}
 # INT_COLS is scoped per pg_table because "number" is an integer only in
 # z_report, while it is a free-form text value (e.g. "26-200-000001") in
 # document / pos_order.
@@ -459,6 +459,34 @@ TABLE_MAP = {
         "columns": {"Id": "id", "CustomerId": "customer_id", "Type": "type", "Value": "value"},
         "conflict": ["id"],
     },
+    "Tax": {
+        "pg_table": "tax",
+        "columns": {
+            "Id": "id", "Name": "name", "Rate": "rate", "Code": "code",
+            "IsFixed": "is_fixed", "IsTaxOnTotal": "is_tax_on_total", "IsEnabled": "is_enabled",
+        },
+        "conflict": ["id"],
+    },
+    "ProductTax": {
+        "pg_table": "product_tax",
+        "columns": {"ProductId": "product_id", "TaxId": "tax_id"},
+        "conflict": ["product_id", "tax_id"],
+        "pk_text_expr": "product_id::text || '|' || tax_id::text",
+    },
+    "DocumentCategory": {
+        "pg_table": "document_category",
+        "columns": {"Id": "id", "Name": "name", "LanguageKey": "language_key"},
+        "conflict": ["id"],
+    },
+    "StartingCash": {
+        "pg_table": "starting_cash",
+        "columns": {
+            "Id": "id", "UserId": "user_id", "Amount": "amount",
+            "Description": "description", "StartingCashType": "starting_cash_type",
+            "ZReportNumber": "z_report_number", "DateCreated": "date_created",
+        },
+        "conflict": ["id"],
+    },
 }
 
 
@@ -481,7 +509,7 @@ async def healthz():
     try:
         async with app.state.pool.acquire() as conn:
             await conn.fetchval("SELECT 1")
-        return {"ok": True, "version": "12.0.0"}
+        return {"ok": True, "version": "12.1.0"}
     except Exception as e:
         raise HTTPException(503, f"db unreachable: {e}")
 
