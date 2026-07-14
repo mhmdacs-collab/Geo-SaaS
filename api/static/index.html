@@ -214,6 +214,10 @@ button,input,select{font-family:inherit}
   .tabs{width:100%;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
   .tab{flex-shrink:0}
   .mgrid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .mgrid-3{grid-template-columns:repeat(3,1fr);gap:6px}
+  .mgrid-3 .mc-val{font-size:13px}
+  .mgrid-3 .mc-label{font-size:9px}
+  .mgrid-3 .mc-ico svg{width:14px;height:14px}
   .mc-val{font-size:16px}
   .row2{grid-template-columns:1fr}
   .tax-grid{grid-template-columns:1fr}
@@ -593,15 +597,15 @@ function loadSyncStatus() {
 function renderDayData(d, recent) {
   var html = '';
 
-  // 1. المبيعات
-  html += '<div class="mgrid">'
+  // 1. المبيعات (3 في صف واحد)
+  html += '<div class="mgrid mgrid-3">'
     + metricCard('mc-s', 'إجمالي المبيعات', fmt(d.sales), '', salesIcon())
     + metricCard('mc-r', 'مرتجع المبيعات', fmt(d.refund), '', refundIcon())
     + metricCard('mc-n', 'صافي المبيعات', fmt(d.net_sales), '', netIcon())
     + '</div>';
 
-  // 2. المشتريات
-  html += '<div class="mgrid">'
+  // 2. المشتريات (3 في صف واحد)
+  html += '<div class="mgrid mgrid-3">'
     + metricCard('mc-p', 'إجمالي المشتريات', fmt(d.purchases), '', purchaseIcon())
     + metricCard('mc-r', 'مرتجع المشتريات', fmt(d.stock_return), '', returnIcon())
     + metricCard('mc-n', 'صافي المشتريات', fmt(d.purchases - d.stock_return), '', netIcon())
