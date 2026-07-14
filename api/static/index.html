@@ -491,7 +491,7 @@ function doLogin() {
     document.getElementById('appPage').style.display = 'block';
 
     renderSidebar();
-    selectBranch(null);
+    selectDefaultBranch();
 
     if (!ONBOARDED) {
       showModal('onboardModal');
@@ -553,6 +553,16 @@ function updateSidebarActive() {
 
 function selectBranch(deviceId) {
   CURRENT_BRANCH = deviceId;
+  updateSidebarActive();
+  refreshData();
+}
+
+function selectDefaultBranch() {
+  var mainBranch = null;
+  for (var i = 0; i < BRANCHES.length; i++) {
+    if (BRANCHES[i].branch_type === 'main') { mainBranch = BRANCHES[i]; break; }
+  }
+  CURRENT_BRANCH = mainBranch ? mainBranch.device_id : null;
   updateSidebarActive();
   refreshData();
 }
