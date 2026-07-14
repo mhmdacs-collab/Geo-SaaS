@@ -111,8 +111,8 @@ def _period_bounds(close_hour, offset=0):
     return current_close + timedelta(days=offset), current_close + timedelta(days=offset + 1)
 
 
-async def _verify_password(stored, pwd):
-    """Verify password against stored value. No auto-save."""
+def _verify_password(stored, pwd):
+    """Verify password against stored value."""
     stored = (stored or "").strip()
     if not stored:
         return False
@@ -149,7 +149,7 @@ async def portal_login(body: dict, request: Request):
             SELECT id AS tenant_id, store_name, tax_number, phone_number,
                    COALESCE(close_hour, 0) AS close_hour,
                    COALESCE(onboarded, false) AS onboarded,
-                   custom_password,
+                   password,
                    COALESCE(status, 'active') AS sub_status
             FROM tenants WHERE tax_number = $1
         """, tax)
@@ -157,10 +157,10 @@ async def portal_login(body: dict, request: Request):
             raise HTTPException(401, "Tax number not registered")
         if tenant["sub_status"] not in ("active", "", None):
             raise HTTPException(403, "Subscription inactive")
-        # Determine the active password: custom_password if set, otherwise phone_number
-        has_custom = bool(tenant["custom_password"])
-        active_password = tenant["custom_password"] if has_custom else tenant["phone_number"]
-        ok = await _verify_password(active_password, pwd)
+        # Use password column directly (copied from phone_number initially)
+        has_custom = bool(tenant["password"] and tenant["password"] != tenant["phone_number"])
+        active_password = tenant["password"] or tenant["phone_number"]
+        ok = _verify_password(active_password, pwd)
         if not ok:
             raise HTTPException(401, "Incorrect password")
 
@@ -216,7 +216,7 @@ async def portal_change_password(body: dict, request: Request):
     hashed = bcrypt.hash(new_pwd)
     pool = state.pool
     async with pool.acquire() as conn:
-        await conn.execute("UPDATE tenants SET custom_password = $1 WHERE id = $2", hashed, auth.get("tenant_id"))
+        await conn.execute("UPDATE tenants SET password = $1 WHERE id = $2", hashed, auth.get("tenant_id"))
     return {"success": True}
 
 
