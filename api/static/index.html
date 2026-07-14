@@ -299,63 +299,7 @@ button,input,select{font-family:inherit}
         <button class="tab" onclick="switchTab('quarter',this)">الربع</button>
       </div>
 
-      <div id="metricsArea"></div>
-
-      <div class="row2" id="bottomSection">
-        <div class="panel">
-          <div class="panel-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-            قنوات الدفع
-          </div>
-          <div id="payArea"></div>
-        </div>
-        <div class="panel">
-          <div class="panel-title">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            آخر العمليات
-          </div>
-          <div id="recentArea"></div>
-        </div>
-      </div>
-
-      <div class="tax-section" id="taxSection">
-        <div class="tax-head">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          الإقرار الضريبي — <span id="taxPeriodLbl">الربع الحالي</span>
-        </div>
-        <div class="tax-grid">
-          <div class="tax-node">
-            <div class="tax-lbl">ضريبة المبيعات</div>
-            <div class="tax-val" id="tSales">—</div>
-          </div>
-          <div class="tax-node">
-            <div class="tax-lbl">ضريبة المشتريات</div>
-            <div class="tax-val" id="tPur">—</div>
-          </div>
-          <div class="tax-node">
-            <div class="tax-lbl">المستحق للهيئة</div>
-            <div class="tax-val due" id="tDue">—</div>
-          </div>
-        </div>
-        <div class="tax-foot">
-          <div style="flex:1">
-            <div class="prog-bg"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
-            <div class="prog-lbl" id="progLbl">—</div>
-          </div>
-          <button class="btn-print" onclick="doPrint()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            طباعة الإقرار
-          </button>
-        </div>
-      </div>
-
-      <div class="branch-cmp" id="branchCmp" style="display:none">
-        <div class="cmp-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          مقارنة الفروع
-        </div>
-        <div id="cmpRows"></div>
-      </div>
+      <div id="dashboardContent"></div>
     </div>
   </div>
 </div>
@@ -581,7 +525,6 @@ function refreshData() {
   loadTabData();
   loadQuarterData();
   loadSyncStatus();
-  loadRecent();
 }
 
 function loadTabData() {
@@ -592,11 +535,14 @@ function loadTabData() {
 }
 
 function loadDay(offset) {
-  fetch(API + '/day?offset=' + offset + tenantParam(), {headers: apiHeaders()})
-  .then(function(r) { return r.json(); })
-  .then(function(d) {
-    renderDayMetrics(d);
-    renderPayments(d.payment_breakdown);
+  Promise.all([
+    fetch(API + '/day?offset=' + offset + tenantParam(), {headers: apiHeaders()}).then(function(r) { return r.json(); }),
+    fetch(API + '/recent?offset=' + offset + tenantParam(), {headers: apiHeaders()}).then(function(r) { return r.json(); })
+  ])
+  .then(function(results) {
+    var dayData = results[0];
+    var recentData = results[1];
+    renderDayData(dayData, recentData);
   })
   .catch(function() {});
 }
@@ -605,9 +551,7 @@ function loadMonth() {
   fetch(API + '/month' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
   .then(function(r) { return r.json(); })
   .then(function(d) {
-    renderMonthMetrics(d);
-    renderPayments(d.payment_breakdown);
-    renderBranchCompare(d.branch_breakdown);
+    renderMonthData(d);
   })
   .catch(function() {});
 }
@@ -616,9 +560,7 @@ function loadQuarterTab() {
   fetch(API + '/quarter' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
   .then(function(r) { return r.json(); })
   .then(function(d) {
-    renderQuarterMetrics(d);
-    renderPayments(d.payment_breakdown);
-    renderBranchCompare(d.branch_breakdown);
+    renderQuarterData(d);
   })
   .catch(function() {});
 }
@@ -628,13 +570,6 @@ function loadQuarterData() {
   .then(function(r) { return r.json(); })
   .then(function(d) {
     lastQuarterData = d;
-    document.getElementById('tSales').textContent = fmt(d.tax_sales);
-    document.getElementById('tPur').textContent = fmt(d.tax_purchases);
-    document.getElementById('tDue').textContent = fmt(d.vat_due);
-    document.getElementById('taxPeriodLbl').textContent = d.period_label || 'الربع الحالي';
-    var prog = d.quarter_progress || 0;
-    document.getElementById('progFill').style.width = prog + '%';
-    document.getElementById('progLbl').textContent = 'تقدم الربع: ' + Math.round(prog) + '%' + (d.days_remaining ? ' — متبقي ' + d.days_remaining + ' يوم' : '');
   })
   .catch(function() {});
 }
@@ -653,46 +588,189 @@ function loadSyncStatus() {
   .catch(function() {});
 }
 
-function loadRecent() {
-  fetch(API + '/recent?offset=0' + tenantParam(), {headers: apiHeaders()})
-  .then(function(r) { return r.json(); })
-  .then(function(d) { renderRecent(d); })
-  .catch(function() {});
-}
-
 /* ── RENDERERS ── */
-function renderDayMetrics(d) {
-  var html = '<div class="mgrid">'
-    + metricCard('mc-s', 'المبيعات', fmt(d.sales), (d.sales_count || 0) + ' فاتورة', salesIcon())
-    + metricCard('mc-r', 'المرتجعات', fmt(d.refund), '', refundIcon())
+function renderDayData(d, recent) {
+  var html = '';
+
+  // 1. المبيعات section
+  html += '<div class="mgrid">'
+    + metricCard('mc-s', 'إجمالي المبيعات', fmt(d.sales), '', salesIcon())
+    + metricCard('mc-r', 'مرتجع المبيعات', fmt(d.refund), '', refundIcon())
     + metricCard('mc-n', 'صافي المبيعات', fmt(d.net_sales), '', netIcon())
-    + metricCard('mc-p', 'المشتريات', fmt(d.purchases), (d.purchases_count || 0) + ' عملية', purchaseIcon())
-    + metricCard('mc-r', 'مرتجع المخزون', fmt(d.stock_return), '', returnIcon())
-    + metricCard('mc-i', 'صافي الدخل', fmt(d.net_income), '', incomeIcon())
     + '</div>';
-  document.getElementById('metricsArea').innerHTML = html;
+
+  // 2. قنوات الدفع section
+  html += renderPaymentsPanel(d.payment_breakdown);
+
+  // 3. آخر 7 عمليات section
+  html += renderRecentPanel(recent.operations || []);
+
+  // 4. المشتريات section
+  html += '<div class="mgrid">'
+    + metricCard('mc-p', 'إجمالي المشتريات', fmt(d.purchases), '', purchaseIcon())
+    + metricCard('mc-r', 'مرتجع المشتريات', fmt(d.stock_return), '', returnIcon())
+    + metricCard('mc-n', 'صافي المشتريات', fmt(d.purchases - d.stock_return), '', netIcon())
+    + '</div>';
+
+  // 5. المصاريف والخزينة section
+  html += '<div class="mgrid">'
+    + metricCard('mc-s', 'وارد الخزينة', fmt(d.treasury_in), '', incomeIcon())
+    + metricCard('mc-r', 'مصروف الخزينة', fmt(d.treasury_out), '', expenseIcon())
+    + '</div>';
+
+  // 6. الإقرار الضريبي section (always visible, uses quarter data)
+  html += renderTaxSection(lastQuarterData || d);
+
+  document.getElementById('dashboardContent').innerHTML = html;
 }
 
-function renderMonthMetrics(d) {
-  var html = '<div class="mgrid">'
-    + metricCard('mc-s', 'المبيعات', fmt(d.sales), '', salesIcon())
-    + metricCard('mc-r', 'المرتجعات', fmt(d.refund), '', refundIcon())
-    + metricCard('mc-n', 'صافي المبيعات', fmt(d.net_sales), '', netIcon())
-    + metricCard('mc-p', 'المشتريات', fmt(d.purchases), '', purchaseIcon())
-    + metricCard('mc-r', 'مرتجع المخزون', fmt(d.stock_return), '', returnIcon())
+function renderMonthData(d) {
+  var html = '';
+
+  // 1. صافي الإيرادات
+  html += '<div class="mgrid">'
+    + metricCard('mc-n', 'صافي الإيرادات', fmt(d.net_sales), '', netIcon())
     + '</div>';
-  document.getElementById('metricsArea').innerHTML = html;
+
+  // 2. صافي المصروفات
+  var net_expenses = d.purchases + (d.treasury_out || 0) - d.refund;
+  html += '<div class="mgrid">'
+    + metricCard('mc-r', 'صافي المصروفات', fmt(net_expenses), '', expenseIcon())
+    + '</div>';
+
+  // 3. قنوات الدفع
+  html += renderPaymentsPanel(d.payment_breakdown);
+
+  // 4. الإقرار الضريبي
+  html += renderTaxSection(d);
+
+  // 5. مقارنة الفروع (only when all branches)
+  if (CURRENT_BRANCH === null && d.branch_breakdown) {
+    html += renderBranchComparePanel(d.branch_breakdown);
+  }
+
+  document.getElementById('dashboardContent').innerHTML = html;
 }
 
-function renderQuarterMetrics(d) {
-  var html = '<div class="mgrid">'
-    + metricCard('mc-s', 'المبيعات', fmt(d.sales), '', salesIcon())
-    + metricCard('mc-r', 'المرتجعات', fmt(d.refund), '', refundIcon())
-    + metricCard('mc-n', 'صافي المبيعات', fmt(d.net_sales), '', netIcon())
-    + metricCard('mc-p', 'المشتريات', fmt(d.purchases), '', purchaseIcon())
-    + metricCard('mc-r', 'مرتجع المخزون', fmt(d.stock_return), '', returnIcon())
+function renderQuarterData(d) {
+  var html = '';
+
+  // 1. مبيعات الربع
+  html += '<div class="mgrid">'
+    + metricCard('mc-s', 'إجمالي مبيعات الربع', fmt(d.sales), '', salesIcon())
+    + metricCard('mc-r', 'مرتجع مبيعات الربع', fmt(d.refund), '', refundIcon())
+    + metricCard('mc-n', 'صافي مبيعات الربع', fmt(d.net_sales), '', netIcon())
     + '</div>';
-  document.getElementById('metricsArea').innerHTML = html;
+
+  // 2. مشتريات الربع
+  html += '<div class="mgrid">'
+    + metricCard('mc-p', 'إجمالي مشتريات الربع', fmt(d.purchases), '', purchaseIcon())
+    + metricCard('mc-r', 'مرتجع مشتريات الربع', fmt(d.stock_return || 0), '', returnIcon())
+    + metricCard('mc-n', 'صافي مشتريات الربع', fmt(d.purchases - (d.stock_return || 0)), '', netIcon())
+    + '</div>';
+
+  // 3. الإقرار الضريبي
+  html += renderTaxSection(d);
+
+  // 4. مقارنة الفروع (only when all branches)
+  if (CURRENT_BRANCH === null && d.branch_breakdown) {
+    html += renderBranchComparePanel(d.branch_breakdown);
+  }
+
+  document.getElementById('dashboardContent').innerHTML = html;
+}
+
+function renderPaymentsPanel(pb) {
+  if (!pb || !Object.keys(pb).length) return '';
+  var html = '<div class="panel"><div class="panel-title">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>'
+    + 'قنوات الدفع</div>';
+  var colors = {'cash':'#10b981','card':'#8b5cf6','transfer':'#00BCD4','credit':'#f59e0b'};
+  var labels = {'cash':'نقدي','card':'بطاقة','transfer':'تحويل','credit':'آجل'};
+  var keys = Object.keys(pb);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var c = colors[k] || '#64748b';
+    var lbl = labels[k] || k;
+    html += '<div class="pay-item">'
+      + '<div class="pay-left"><div class="pay-dot" style="background:' + c + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>' + lbl + '</div>'
+      + '<div class="pay-val">' + fmt(pb[k]) + '</div>'
+      + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderRecentPanel(ops) {
+  if (!ops || !ops.length) return '';
+  var html = '<div class="panel"><div class="panel-title">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>'
+    + 'آخر 7 عمليات</div>';
+
+  var badgeMap = {
+    'sale': {cls: 'rec-badge-s', txt: 'بيع'},
+    'refund': {cls: 'rec-badge-r', txt: 'مرتجع'},
+    'purchase': {cls: 'rec-badge-p', txt: 'مشتري'},
+    'stock_return': {cls: 'rec-badge-r', txt: 'مرتجع مخزون'},
+    'expense': {cls: 'rec-badge-p', txt: 'مصروف'}
+  };
+
+  for (var i = 0; i < ops.length; i++) {
+    var op = ops[i];
+    var badge = badgeMap[op.type] || {cls: 'rec-badge-p', txt: op.type};
+    var dateStr = op.date ? new Date(op.date).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit'}) : '';
+    html += '<div class="rec-item">'
+      + '<div><div class="rec-num">' + (op.number || '—') + '<span class="rec-badge ' + badge.cls + '">' + badge.txt + '</span></div>'
+      + '<div class="rec-date">' + dateStr + (op.branch_name ? ' • ' + op.branch_name : '') + '</div></div>'
+      + '<div class="rec-amt">' + fmt(op.amount) + '</div>'
+      + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderTaxSection(d) {
+  var html = '<div class="tax-section"><div class="tax-head">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+    + 'الإقرار الضريبي — <span>' + (d.period_label || 'الربع الحالي') + '</span>'
+    + '</div>'
+    + '<div class="tax-grid">'
+    + '<div class="tax-node"><div class="tax-lbl">ضريبة المبيعات</div><div class="tax-val">' + fmt(d.tax_sales || 0) + '</div></div>'
+    + '<div class="tax-node"><div class="tax-lbl">ضريبة المشتريات</div><div class="tax-val">' + fmt(d.tax_purchases || 0) + '</div></div>'
+    + '<div class="tax-node"><div class="tax-lbl">المستحق للهيئة</div><div class="tax-val due">' + fmt(d.vat_due || 0) + '</div></div>'
+    + '</div>';
+
+  if (d.quarter_progress !== undefined) {
+    html += '<div class="tax-foot"><div style="flex:1">'
+      + '<div class="prog-bg"><div class="prog-fill" style="width:' + d.quarter_progress + '%"></div></div>'
+      + '<div class="prog-lbl">تقدم الربع: ' + Math.round(d.quarter_progress) + '%' + (d.days_remaining ? ' — متبقي ' + d.days_remaining + ' يوم' : '') + '</div>'
+      + '</div>'
+      + '<button class="btn-print" onclick="doPrint()">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>'
+      + 'طباعة الإقرار</button></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderBranchComparePanel(bb) {
+  if (!bb || !bb.length) return '';
+  var html = '<div class="branch-cmp"><div class="cmp-title">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'
+    + 'مقارنة الفروع</div>';
+  var max = 0;
+  for (var i = 0; i < bb.length; i++) if (bb[i].total > max) max = bb[i].total;
+  var colors = ['#00BCD4','#10b981','#8b5cf6','#f59e0b','#ef4444','#0891B2'];
+  for (var i = 0; i < bb.length; i++) {
+    var pct = max > 0 ? (bb[i].total / max * 100) : 0;
+    var c = colors[i % colors.length];
+    html += '<div class="cmp-row">'
+      + '<div class="cmp-label"><span>' + bb[i].branch_name + '</span><span>' + fmt(bb[i].total) + '</span></div>'
+      + '<div class="cmp-bar"><div class="cmp-fill" style="width:' + pct + '%;background:' + c + '"></div></div>'
+      + '</div>';
+  }
+  html += '</div>';
+  return html;
 }
 
 function metricCard(cls, label, val, foot, ico) {
@@ -709,73 +787,7 @@ function netIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="curren
 function purchaseIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>'; }
 function returnIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>'; }
 function incomeIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'; }
-
-function renderPayments(pb) {
-  var area = document.getElementById('payArea');
-  if (!pb || !Object.keys(pb).length) { area.innerHTML = '<div class="no-data">لا توجد بيانات</div>'; return; }
-  var colors = {'cash':'#10b981','card':'#8b5cf6','transfer':'#00BCD4','credit':'#f59e0b'};
-  var labels = {'cash':'نقدي','card':'بطاقة','transfer':'تحويل','credit':'آجل'};
-  var html = '';
-  var keys = Object.keys(pb);
-  for (var i = 0; i < keys.length; i++) {
-    var k = keys[i];
-    var c = colors[k] || '#64748b';
-    var lbl = labels[k] || k;
-    html += '<div class="pay-item">'
-      + '<div class="pay-left"><div class="pay-dot" style="background:' + c + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>' + lbl + '</div>'
-      + '<div class="pay-val">' + fmt(pb[k]) + '</div>'
-      + '</div>';
-  }
-  area.innerHTML = html;
-}
-
-function renderRecent(d) {
-  var area = document.getElementById('recentArea');
-  var items = [];
-  if (d.sales) for (var i = 0; i < d.sales.length; i++) items.push({type:'s', num: d.sales[i].invoice_number, date: d.sales[i].invoice_date, amt: d.sales[i].total_with_tax, method: d.sales[i].payment_method});
-  if (d.refunds) for (var i = 0; i < d.refunds.length; i++) items.push({type:'r', num: d.refunds[i].invoice_number, date: d.refunds[i].invoice_date, amt: d.refunds[i].total_with_tax});
-  if (d.purchases) for (var i = 0; i < d.purchases.length; i++) items.push({type:'p', num: d.purchases[i].invoice_number, date: d.purchases[i].invoice_date, amt: d.purchases[i].total_with_tax});
-  if (d.stock_returns) for (var i = 0; i < d.stock_returns.length; i++) items.push({type:'p', num: d.stock_returns[i].invoice_number, date: d.stock_returns[i].invoice_date, amt: d.stock_returns[i].total_with_tax});
-
-  if (!items.length) { area.innerHTML = '<div class="no-data">لا توجد عمليات حديثة</div>'; return; }
-
-  items.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
-  items = items.slice(0, 10);
-
-  var html = '';
-  for (var i = 0; i < items.length; i++) {
-    var it = items[i];
-    var badgeCls = it.type === 's' ? 'rec-badge-s' : (it.type === 'r' ? 'rec-badge-r' : 'rec-badge-p');
-    var badgeTxt = it.type === 's' ? 'بيع' : (it.type === 'r' ? 'مرتجع' : 'مشتري');
-    var clr = it.type === 's' ? 'clr-s' : (it.type === 'r' ? 'clr-r' : 'clr-p');
-    html += '<div class="rec-item">'
-      + '<div><div class="rec-num">' + (it.num || '—') + '<span class="rec-badge ' + badgeCls + '">' + badgeTxt + '</span></div>'
-      + '<div class="rec-date">' + (it.date || '') + '</div></div>'
-      + '<div class="rec-amt ' + clr + '">' + fmt(it.amt) + '</div>'
-      + '</div>';
-  }
-  area.innerHTML = html;
-}
-
-function renderBranchCompare(bb) {
-  var cmp = document.getElementById('branchCmp');
-  var rows = document.getElementById('cmpRows');
-  if (!bb || !bb.length || CURRENT_BRANCH !== null) { cmp.style.display = 'none'; return; }
-  cmp.style.display = 'block';
-  var max = 0;
-  for (var i = 0; i < bb.length; i++) if (bb[i].total > max) max = bb[i].total;
-  var colors = ['#00BCD4','#10b981','#8b5cf6','#f59e0b','#ef4444','#0891B2'];
-  var html = '';
-  for (var i = 0; i < bb.length; i++) {
-    var pct = max > 0 ? (bb[i].total / max * 100) : 0;
-    var c = colors[i % colors.length];
-    html += '<div class="cmp-row">'
-      + '<div class="cmp-label"><span>' + bb[i].branch_name + '</span><span>' + fmt(bb[i].total) + '</span></div>'
-      + '<div class="cmp-bar"><div class="cmp-fill" style="width:' + pct + '%;background:' + c + '"></div></div>'
-      + '</div>';
-  }
-  rows.innerHTML = html;
-}
+function expenseIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="18" y2="14"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="6" y1="10" x2="6" y2="14"/></svg>'; }
 
 /* ── SETTINGS ── */
 function openSettings() {

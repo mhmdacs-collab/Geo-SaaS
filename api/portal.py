@@ -29,6 +29,7 @@ SALES = "2"
 REFUND = "4"
 PURCHASE = "1"
 STOCK_RETURN = "5"
+EXPENSE = "6"
 
 def hash_password(password: str) -> str:
     """Hash password using SHA256 with salt."""
@@ -274,6 +275,15 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
             GROUP BY pt.name
         """, tid, did, start, end, SALES)
 
+        # Treasury: starting_cash (0=income, 1=expense)
+        treasury_rows = await conn.fetch("""
+            SELECT starting_cash_type, COALESCE(SUM(amount), 0) AS total
+            FROM starting_cash
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND date_created >= $3 AND date_created < $4
+            GROUP BY starting_cash_type
+        """, tid, did, start, end)
+
     sales = refund = purchases = stock_return = 0.0
     cnt_s = cnt_p = cnt_sr = 0
     for r in rows:
@@ -284,6 +294,12 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
         elif dt == PURCHASE: purchases = t; cnt_p = r["cnt"]
         elif dt == STOCK_RETURN: stock_return = t; cnt_sr = r["cnt"]
 
+    treasury_in = treasury_out = 0.0
+    for r in treasury_rows:
+        t = n(r["total"])
+        if r["starting_cash_type"] == 0: treasury_in = t
+        elif r["starting_cash_type"] == 1: treasury_out = t
+
     return {
         "period_start": start.isoformat(), "period_end": end.isoformat(),
         "sales": round(sales, 2), "refund": round(refund, 2),
@@ -291,6 +307,8 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
         "purchases": round(purchases, 2), "stock_return": round(stock_return, 2),
         "purchases_count": cnt_p, "sales_count": cnt_s,
         "net_income": round(sales - refund - purchases + stock_return, 2),
+        "treasury_in": round(treasury_in, 2),
+        "treasury_out": round(treasury_out, 2),
         "payment_breakdown": {r["pay_name"]: round(n(r["total"]), 2) for r in pay_rows},
     }
 
@@ -341,8 +359,18 @@ async def _period_data(pool, tid, did, period):
             ORDER BY total DESC
         """, tid, SALES)
 
+        # Treasury: starting_cash (0=income, 1=expense)
+        treasury_rows = await conn.fetch(f"""
+            SELECT starting_cash_type, COALESCE(SUM(amount), 0) AS total
+            FROM starting_cash
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND DATE_TRUNC('{trunc}', date_created) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+            GROUP BY starting_cash_type
+        """, tid, did)
+
     sales = refund = purchases = 0.0
     tax_s = tax_r = tax_p = 0.0
+    treasury_in = treasury_out = 0.0
     for r in rows:
         t = n(r["total"]); dt = r["document_type_id"]
         if dt == SALES: sales = t
@@ -353,6 +381,10 @@ async def _period_data(pool, tid, did, period):
         if dt == SALES: tax_s = t
         elif dt == REFUND: tax_r = abs(t)
         elif dt == PURCHASE: tax_p = t
+    for r in treasury_rows:
+        t = n(r["total"])
+        if r["starting_cash_type"] == 0: treasury_in = t
+        elif r["starting_cash_type"] == 1: treasury_out = t
 
     q_label = ""; progress = days_remaining = 0
     if period == "quarter":
@@ -377,6 +409,8 @@ async def _period_data(pool, tid, did, period):
         "tax_sales": round(tax_s - tax_r, 2), "tax_refund": round(tax_r, 2),
         "tax_purchases": round(tax_p, 2),
         "vat_due": round((tax_s - tax_r) - tax_p, 2),
+        "treasury_in": round(treasury_in, 2),
+        "treasury_out": round(treasury_out, 2),
         "payment_breakdown": {r["pay_name"]: round(n(r["total"]), 2) for r in pay_rows},
         "branch_breakdown": [{"device_id": str(r["device_id"]), "branch_name": r["branch_name"], "total": round(n(r["total"]), 2)} for r in branch_rows],
         "quarter_progress": progress, "days_remaining": days_remaining,
@@ -487,53 +521,62 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
     pool = state.pool
 
     async with pool.acquire() as conn:
-        sales = await conn.fetch("""
-            SELECT d.number AS invoice_number, d.date_created AS invoice_date,
-                   d.total AS total_with_tax, pt.name AS payment_method
+        # Unified query: all document types + treasury, sorted by date, last 7
+        doc_rows = await conn.fetch("""
+            SELECT d.id, d.document_type_id, d.number, d.date_created,
+                   d.total, d.device_id,
+                   pt.name AS payment_method,
+                   dev.branch_name
             FROM document d
+            LEFT JOIN devices dev ON dev.id = d.device_id
             LEFT JOIN payment p ON p.document_id = d.id AND p.tenant_id = d.tenant_id AND p.device_id = d.device_id
             LEFT JOIN payment_type pt ON pt.id = p.payment_type_id AND pt.tenant_id = p.tenant_id AND pt.device_id = p.device_id
             WHERE d.tenant_id = $1::uuid AND ($2::uuid IS NULL OR d.device_id = $2::uuid)
               AND d.date_created >= $3 AND d.date_created < $4
-              AND d.document_type_id = $5
-            ORDER BY d.date_created DESC LIMIT 10
-        """, tid, did, start, end, SALES)
+              AND d.document_type_id = ANY($5::text[])
+            ORDER BY d.date_created DESC
+        """, tid, did, start, end, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
-        refunds = await conn.fetch("""
-            SELECT number AS invoice_number, date_created AS invoice_date, total AS total_with_tax
-            FROM document
-            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-              AND date_created >= $3 AND date_created < $4
-              AND document_type_id = $5
-            ORDER BY date_created DESC LIMIT 5
-        """, tid, did, start, end, REFUND)
+        treasury_rows = await conn.fetch("""
+            SELECT sc.id, sc.starting_cash_type, sc.amount, sc.date_created,
+                   sc.device_id, dev.branch_name
+            FROM starting_cash sc
+            LEFT JOIN devices dev ON dev.id = sc.device_id
+            WHERE sc.tenant_id = $1::uuid AND ($2::uuid IS NULL OR sc.device_id = $2::uuid)
+              AND sc.date_created >= $3 AND sc.date_created < $4
+            ORDER BY sc.date_created DESC
+        """, tid, did, start, end)
 
-        purchases = await conn.fetch("""
-            SELECT d.number AS invoice_number, d.date_created AS invoice_date,
-                   d.total AS total_with_tax, c.name AS supplier_name
-            FROM document d
-            LEFT JOIN customer c ON c.id = d.customer_id AND c.tenant_id = d.tenant_id AND c.device_id = d.device_id
-            WHERE d.tenant_id = $1::uuid AND ($2::uuid IS NULL OR d.device_id = $2::uuid)
-              AND d.date_created >= $3 AND d.date_created < $4
-              AND d.document_type_id = $5
-            ORDER BY d.date_created DESC LIMIT 5
-        """, tid, did, start, end, PURCHASE)
+    type_map = {SALES: "sale", REFUND: "refund", PURCHASE: "purchase", STOCK_RETURN: "stock_return"}
 
-        stock_returns = await conn.fetch("""
-            SELECT number AS invoice_number, date_created AS invoice_date, total AS total_with_tax
-            FROM document
-            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-              AND date_created >= $3 AND date_created < $4
-              AND document_type_id = $5
-            ORDER BY date_created DESC LIMIT 5
-        """, tid, did, start, end, STOCK_RETURN)
+    operations = []
+    for r in doc_rows:
+        operations.append({
+            "id": str(r["id"]),
+            "type": type_map.get(r["document_type_id"], "sale"),
+            "number": r["number"] or "",
+            "date": r["date_created"].isoformat() if r["date_created"] else "",
+            "amount": round(n(r["total"]), 2),
+            "branch_name": r["branch_name"] or "",
+            "payment_method": r["payment_method"] or "" if r["document_type_id"] == SALES else "",
+        })
 
-    return {
-        "sales": [to_d(r) for r in sales],
-        "refunds": [to_d(r) for r in refunds],
-        "purchases": [to_d(r) for r in purchases],
-        "stock_returns": [to_d(r) for r in stock_returns],
-    }
+    for r in treasury_rows:
+        operations.append({
+            "id": str(r["id"]),
+            "type": "expense" if r["starting_cash_type"] == 1 else "expense",
+            "number": "وارد خزينة" if r["starting_cash_type"] == 0 else "مصروف خزينة",
+            "date": r["date_created"].isoformat() if r["date_created"] else "",
+            "amount": round(n(r["amount"]), 2),
+            "branch_name": r["branch_name"] or "",
+            "payment_method": "",
+        })
+
+    # Sort all by date descending, take last 7
+    operations.sort(key=lambda x: x["date"] or "", reverse=True)
+    operations = operations[:7]
+
+    return {"operations": operations}
 
 
 # === SYNC STATUS ===
