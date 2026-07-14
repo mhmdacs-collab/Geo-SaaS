@@ -111,7 +111,8 @@ def _period_bounds(close_hour, offset=0):
     return current_close + timedelta(days=offset), current_close + timedelta(days=offset + 1)
 
 
-async def _verify_password(conn, stored, pwd, tenant_id):
+async def _verify_password(stored, pwd):
+    """Verify password against stored value. No auto-save."""
     stored = (stored or "").strip()
     if not stored:
         return False
@@ -120,14 +121,7 @@ async def _verify_password(conn, stored, pwd, tenant_id):
             return bcrypt.verify(pwd, stored)
         except Exception:
             return False
-    if stored == pwd:
-        try:
-            new_hash = bcrypt.hash(pwd)
-            await conn.execute("UPDATE tenants SET custom_password=$1 WHERE id=$2", new_hash, tenant_id)
-        except Exception:
-            pass
-        return True
-    return False
+    return stored == pwd
 
 
 async def _get_auth(request):
@@ -166,7 +160,7 @@ async def portal_login(body: dict, request: Request):
         # Determine the active password: custom_password if set, otherwise phone_number
         has_custom = bool(tenant["custom_password"])
         active_password = tenant["custom_password"] if has_custom else tenant["phone_number"]
-        ok = await _verify_password(conn, active_password, pwd, tenant["tenant_id"])
+        ok = await _verify_password(active_password, pwd)
         if not ok:
             raise HTTPException(401, "Incorrect password")
 
