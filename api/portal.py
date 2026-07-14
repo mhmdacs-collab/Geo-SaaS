@@ -368,7 +368,7 @@ async def _period_data(pool, tid, did, period):
             GROUP BY starting_cash_type
         """, tid, did)
 
-    sales = refund = purchases = 0.0
+    sales = refund = purchases = stock_return = 0.0
     tax_s = tax_r = tax_p = 0.0
     treasury_in = treasury_out = 0.0
     for r in rows:
@@ -376,6 +376,7 @@ async def _period_data(pool, tid, did, period):
         if dt == SALES: sales = t
         elif dt == REFUND: refund = abs(t)
         elif dt == PURCHASE: purchases = t
+        elif dt == STOCK_RETURN: stock_return = abs(t)
     for r in tax_rows:
         t = n(r["tax_total"]); dt = r["document_type_id"]
         if dt == SALES: tax_s = t
@@ -406,6 +407,7 @@ async def _period_data(pool, tid, did, period):
     return {
         "sales": round(sales, 2), "refund": round(refund, 2),
         "net_sales": round(sales - refund, 2), "purchases": round(purchases, 2),
+        "stock_return": round(stock_return, 2),
         "tax_sales": round(tax_s - tax_r, 2), "tax_refund": round(tax_r, 2),
         "tax_purchases": round(tax_p, 2),
         "vat_due": round((tax_s - tax_r) - tax_p, 2),
