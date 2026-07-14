@@ -208,6 +208,8 @@ async def portal_login(body: dict, request: Request):
 # === CHANGE PASSWORD ===
 @router.post("/auth/change-password")
 async def portal_change_password(body: dict, request: Request):
+    if not body or not body.get("new_password"):
+        raise HTTPException(400, "Missing new_password")
     state = request.app.state
     auth = await _get_auth(request)
     new_pwd = (body.get("new_password") or "").strip()

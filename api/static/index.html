@@ -370,7 +370,7 @@ button,input,select{font-family:inherit}
       <label>وقت إغلاق النشاط (ساعة 0-23)</label>
       <input type="number" id="setHour" min="0" max="23" value="0">
     </div>
-    <button class="btn" onclick="saveCloseHour()" style="margin-bottom:16px">حفظ وقت الإغلاق</button>
+    <button type="button" class="btn" onclick="saveCloseHour()" style="margin-bottom:16px">حفظ وقت الإغلاق</button>
 
     <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
@@ -386,11 +386,11 @@ button,input,select{font-family:inherit}
       </div>
       <div class="merr" id="pwErr"></div>
       <div class="msuc" id="pwSuc" style="display:none;background:var(--green-l);color:var(--green);border-radius:var(--rs);padding:8px;font-size:11px;font-weight:600;margin-bottom:10px;text-align:center"></div>
-      <button class="btn" onclick="changePw()">تغيير كلمة المرور</button>
+      <button type="button" class="btn" onclick="changePw()">تغيير كلمة المرور</button>
     </div>
 
     <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
-      <button class="btn" onclick="openSupport()" style="background:linear-gradient(135deg,#25D366,#128C7E)">
+      <button type="button" class="btn" onclick="openSupport()" style="background:linear-gradient(135deg,#25D366,#128C7E)">
         تواصل مع الدعم الفني
       </button>
     </div>
@@ -406,7 +406,7 @@ button,input,select{font-family:inherit}
       <label>ساعة الإغلاق (0-23)</label>
       <input type="number" id="onboardHour" min="0" max="23" value="0">
     </div>
-    <button class="btn" onclick="saveOnboard()">بدء الاستخدام</button>
+    <button type="button" class="btn" onclick="saveOnboard()">بدء الاستخدام</button>
   </div>
 </div>
 
