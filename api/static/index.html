@@ -217,6 +217,7 @@ button,input,select{font-family:inherit}
   .mc-val{font-size:16px}
   .row2{grid-template-columns:1fr}
   .tax-grid{grid-template-columns:1fr}
+  .mc-full{grid-column:1/-1}
 }
 </style>
 </head>
@@ -592,34 +593,39 @@ function loadSyncStatus() {
 function renderDayData(d, recent) {
   var html = '';
 
-  // 1. المبيعات section
+  // 1. المبيعات
   html += '<div class="mgrid">'
     + metricCard('mc-s', 'إجمالي المبيعات', fmt(d.sales), '', salesIcon())
     + metricCard('mc-r', 'مرتجع المبيعات', fmt(d.refund), '', refundIcon())
-    + metricCard('mc-n', 'صافي المبيعات', fmt(d.net_sales), '', netIcon())
     + '</div>';
 
-  // 2. قنوات الدفع section
-  html += renderPaymentsPanel(d.payment_breakdown);
+  // 2. صافي المبيعات (full width separator)
+  html += '<div class="mgrid">'
+    + metricCard('mc-n mc-full', 'صافي المبيعات', fmt(d.net_sales), '', netIcon())
+    + '</div>';
 
-  // 3. آخر 7 عمليات section
-  html += renderRecentPanel(recent.operations || []);
-
-  // 4. المشتريات section
+  // 3. المشتريات
   html += '<div class="mgrid">'
     + metricCard('mc-p', 'إجمالي المشتريات', fmt(d.purchases), '', purchaseIcon())
     + metricCard('mc-r', 'مرتجع المشتريات', fmt(d.stock_return), '', returnIcon())
-    + metricCard('mc-n', 'صافي المشتريات', fmt(d.purchases - d.stock_return), '', netIcon())
     + '</div>';
 
-  // 5. المصاريف والخزينة section
+  // 4. صافي المشتريات (full width separator)
+  html += '<div class="mgrid">'
+    + metricCard('mc-n mc-full', 'صافي المشتريات', fmt(d.purchases - d.stock_return), '', netIcon())
+    + '</div>';
+
+  // 5. المصاريف والخزينة
   html += '<div class="mgrid">'
     + metricCard('mc-s', 'وارد الخزينة', fmt(d.treasury_in), '', incomeIcon())
     + metricCard('mc-r', 'مصروف الخزينة', fmt(d.treasury_out), '', expenseIcon())
     + '</div>';
 
-  // 6. الإقرار الضريبي section (always visible, uses quarter data)
-  html += renderTaxSection(lastQuarterData || d);
+  // 6. قنوات الدفع
+  html += renderPaymentsPanel(d.payment_breakdown);
+
+  // 7. آخر 7 عمليات
+  html += renderRecentPanel(recent.operations || []);
 
   document.getElementById('dashboardContent').innerHTML = html;
 }
@@ -627,24 +633,21 @@ function renderDayData(d, recent) {
 function renderMonthData(d) {
   var html = '';
 
-  // 1. صافي الإيرادات
+  // 1. صافي الإيرادات (full width)
   html += '<div class="mgrid">'
-    + metricCard('mc-n', 'صافي الإيرادات', fmt(d.net_sales), '', netIcon())
+    + metricCard('mc-n mc-full', 'صافي الإيرادات', fmt(d.net_sales), '', netIcon())
     + '</div>';
 
-  // 2. صافي المصروفات
+  // 2. صافي المصروفات (full width)
   var net_expenses = d.purchases + (d.treasury_out || 0) - d.refund;
   html += '<div class="mgrid">'
-    + metricCard('mc-r', 'صافي المصروفات', fmt(net_expenses), '', expenseIcon())
+    + metricCard('mc-r mc-full', 'صافي المصروفات', fmt(net_expenses), '', expenseIcon())
     + '</div>';
 
   // 3. قنوات الدفع
   html += renderPaymentsPanel(d.payment_breakdown);
 
-  // 4. الإقرار الضريبي
-  html += renderTaxSection(d);
-
-  // 5. مقارنة الفروع (only when all branches)
+  // 4. مقارنة الفروع (only when all branches)
   if (CURRENT_BRANCH === null && d.branch_breakdown) {
     html += renderBranchComparePanel(d.branch_breakdown);
   }
@@ -659,20 +662,28 @@ function renderQuarterData(d) {
   html += '<div class="mgrid">'
     + metricCard('mc-s', 'إجمالي مبيعات الربع', fmt(d.sales), '', salesIcon())
     + metricCard('mc-r', 'مرتجع مبيعات الربع', fmt(d.refund), '', refundIcon())
-    + metricCard('mc-n', 'صافي مبيعات الربع', fmt(d.net_sales), '', netIcon())
     + '</div>';
 
-  // 2. مشتريات الربع
+  // 2. صافي مبيعات الربع (full width)
+  html += '<div class="mgrid">'
+    + metricCard('mc-n mc-full', 'صافي مبيعات الربع', fmt(d.net_sales), '', netIcon())
+    + '</div>';
+
+  // 3. مشتريات الربع
   html += '<div class="mgrid">'
     + metricCard('mc-p', 'إجمالي مشتريات الربع', fmt(d.purchases), '', purchaseIcon())
     + metricCard('mc-r', 'مرتجع مشتريات الربع', fmt(d.stock_return || 0), '', returnIcon())
-    + metricCard('mc-n', 'صافي مشتريات الربع', fmt(d.purchases - (d.stock_return || 0)), '', netIcon())
     + '</div>';
 
-  // 3. الإقرار الضريبي
+  // 4. صافي مشتريات الربع (full width)
+  html += '<div class="mgrid">'
+    + metricCard('mc-n mc-full', 'صافي مشتريات الربع', fmt(d.purchases - (d.stock_return || 0)), '', netIcon())
+    + '</div>';
+
+  // 5. الإقرار الضريبي
   html += renderTaxSection(d);
 
-  // 4. مقارنة الفروع (only when all branches)
+  // 6. مقارنة الفروع (only when all branches)
   if (CURRENT_BRANCH === null && d.branch_breakdown) {
     html += renderBranchComparePanel(d.branch_breakdown);
   }
