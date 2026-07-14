@@ -208,8 +208,8 @@ button,input,select{font-family:inherit}
   .sb-item svg{width:12px;height:12px;flex-shrink:0}
   .sb-item .sb-sales{display:none}
   .sb-all{border:none;background:transparent;padding:0;margin:0}
-  .sb-all .sb-item{border:1px dashed var(--border);border-radius:99px}
-  .sb-all.active .sb-item{border-style:solid;border-color:rgba(0,188,212,.3);background:var(--brand-xl);color:var(--brand-d)}
+  .sb-all .sb-item{border:1px solid var(--border);border-radius:99px}
+  .sb-all .sb-item.active{border-color:rgba(0,188,212,.3);background:var(--brand-xl);color:var(--brand-d)}
   .main{padding:12px}
   .tabs{width:100%;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
   .tab{flex-shrink:0}
@@ -548,7 +548,7 @@ function updateSidebarActive() {
     var bid = items[i].getAttribute('data-branch');
     items[i].classList.toggle('active', bid === CURRENT_BRANCH);
   }
-  document.getElementById('sbAllWrap').classList.toggle('active', CURRENT_BRANCH === null);
+  document.getElementById('sbAll').classList.toggle('active', CURRENT_BRANCH === null);
 }
 
 function selectBranch(deviceId) {
