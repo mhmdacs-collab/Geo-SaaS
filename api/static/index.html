@@ -631,11 +631,9 @@ function loadSyncStatus() {
     var dateStr = '—';
     if (d.last_doc_date) {
       var dt = new Date(d.last_doc_date);
-      dateStr = dt.toLocaleDateString('ar-SA') + ' ' + dt.toLocaleTimeString('ar-SA', {hour: '2-digit', minute: '2-digit'});
+      dateStr = dt.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: 'numeric'}) + ' ' + dt.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
     }
-    var deviceCount = d.devices ? d.devices.length : 0;
-    var info = 'آخر مزامنة: ' + dateStr + ' | الفواتير: ' + (d.total_invoices || 0) + ' | الأجهزة النشطة: ' + deviceCount;
-    document.getElementById('syncInfo').textContent = info;
+    document.getElementById('syncInfo').textContent = 'آخر مزامنة: ' + dateStr;
   })
   .catch(function() {});
 }
