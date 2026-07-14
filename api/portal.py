@@ -564,7 +564,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
     for r in treasury_rows:
         operations.append({
             "id": str(r["id"]),
-            "type": "expense" if r["starting_cash_type"] == 1 else "expense",
+            "type": "expense" if r["starting_cash_type"] == 1 else "income",
             "number": "وارد خزينة" if r["starting_cash_type"] == 0 else "مصروف خزينة",
             "date": r["date_created"].isoformat() if r["date_created"] else "",
             "amount": round(n(r["amount"]), 2),
