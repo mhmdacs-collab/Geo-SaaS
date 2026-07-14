@@ -155,7 +155,7 @@ async def portal_login(body: dict, request: Request):
             SELECT id AS tenant_id, store_name, tax_number, phone_number,
                    COALESCE(close_hour, 0) AS close_hour,
                    COALESCE(onboarded, false) AS onboarded,
-                   COALESCE(custom_password, phone_number) AS active_password,
+                   custom_password,
                    COALESCE(status, 'active') AS sub_status
             FROM tenants WHERE tax_number = $1
         """, tax)
@@ -163,7 +163,10 @@ async def portal_login(body: dict, request: Request):
             raise HTTPException(401, "Tax number not registered")
         if tenant["sub_status"] not in ("active", "", None):
             raise HTTPException(403, "Subscription inactive")
-        ok = await _verify_password(conn, tenant["active_password"], pwd, tenant["tenant_id"])
+        # Determine the active password: custom_password if set, otherwise phone_number
+        has_custom = bool(tenant["custom_password"])
+        active_password = tenant["custom_password"] if has_custom else tenant["phone_number"]
+        ok = await _verify_password(conn, active_password, pwd, tenant["tenant_id"])
         if not ok:
             raise HTTPException(401, "Incorrect password")
 
@@ -204,6 +207,7 @@ async def portal_login(body: dict, request: Request):
         "tax_number": tax, "close_hour": close_hour, "onboarded": onboarded,
         "branches": branches,
         "support_wa": getattr(state, "support_wa", "966558110150"),
+        "has_custom_password": has_custom,
     }
 
 

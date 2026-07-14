@@ -9,400 +9,354 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --teal:#00BCD4;--teal-d:#0891B2;--teal-xl:#E0F7FA;--teal-2:#0EA5E9;
+  --brand:#00BCD4;--brand-d:#0891B2;--brand-xl:#E0F7FA;
   --dark:#111827;--darker:#04070d;
-  --bg:#EEF2F7;--card:#fff;
+  --bg:#F1F5F9;--card:#fff;
   --text:#0f172a;--muted:#64748b;
   --green:#10b981;--green-l:#ecfdf5;
   --red:#ef4444;--red-l:#fef2f2;
   --amber:#f59e0b;--amber-l:#fffbeb;
   --purple:#8b5cf6;--purple-l:#f3e8ff;
-  --border:#e6ebf1;
-  --r:16px;--rm:11px;--rs:8px;
-  --sh:0 1px 2px rgb(15 23 42/.05),0 1px 3px rgb(15 23 42/.06);
-  --sh-md:0 8px 20px -6px rgb(15 23 42/.14),0 2px 6px -2px rgb(15 23 42/.06);
-  --sh-lg:0 24px 48px -12px rgb(2 6 23/.35);
-  --grad-brand:linear-gradient(135deg,#00BCD4 0%,#0369A1 100%);
-  --grad-dark:radial-gradient(circle at 20% -10%,#12283a 0%,var(--darker) 55%),linear-gradient(160deg,var(--dark) 0%,var(--darker) 100%);
-  --tr:all .22s cubic-bezier(.4,0,.2,1);
+  --border:#e2e8f0;
+  --r:14px;--rm:10px;--rs:8px;
+  --sh:0 1px 3px rgb(15 23 42/.06);
+  --sh-md:0 4px 12px -4px rgb(15 23 42/.1);
+  --sh-lg:0 12px 32px -8px rgb(15 23 42/.2);
+  --grad-brand:linear-gradient(135deg,#00BCD4,#0369A1);
+  --tr:all .2s ease;
 }
-*{box-sizing:border-box;margin:0;padding:0;font-family:'Cairo',sans-serif;-webkit-tap-highlight-color:transparent}
-html{-webkit-text-size-adjust:100%}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Cairo',sans-serif}
 body{background:var(--bg);color:var(--text);min-height:100vh}
-::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px}
-::-webkit-scrollbar-track{background:transparent}
-button,input{font-family:inherit}
-button{-webkit-appearance:none}
+button,input,select{font-family:inherit}
 
-#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--grad-dark);position:relative;overflow:hidden}
-#loginPage::before,#loginPage::after{content:'';position:absolute;border-radius:50%;filter:blur(60px);opacity:.35;pointer-events:none}
-#loginPage::before{width:380px;height:380px;background:var(--teal);top:-120px;right:-100px}
-#loginPage::after{width:320px;height:320px;background:#6366f1;bottom:-140px;left:-100px}
-.lcard{background:rgba(255,255,255,.98);backdrop-filter:blur(10px);padding:42px 34px;border-radius:20px;box-shadow:var(--sh-lg);width:100%;max-width:400px;position:relative;z-index:1;border:1px solid rgba(255,255,255,.5)}
-.lcard-logo{text-align:center;margin-bottom:28px}
-.lcard-logo svg{width:52px;height:52px;filter:drop-shadow(0 4px 10px rgba(0,188,212,.3))}
-.lcard-logo h2{font-size:21px;font-weight:800;color:var(--dark);margin-top:12px;letter-spacing:-.01em}
-.lcard-logo p{font-size:12px;color:var(--muted);margin-top:3px}
-.fg{margin-bottom:16px}
-.fg label{display:block;font-size:12px;font-weight:700;color:var(--dark);margin-bottom:6px}
-.fg input,.fg select{width:100%;padding:12px 14px;border-radius:var(--rm);border:1.5px solid var(--border);font-family:'Cairo',sans-serif;font-size:13.5px;outline:none;transition:var(--tr);background:#f8fafc}
-.fg input:focus,.fg select:focus{border-color:var(--teal);box-shadow:0 0 0 4px var(--teal-xl);background:#fff}
-.btn{width:100%;min-height:46px;padding:12px;background:var(--grad-brand);background-size:160% 160%;color:#fff;border:none;border-radius:var(--rm);font-size:14.5px;font-weight:700;cursor:pointer;transition:var(--tr);font-family:'Cairo',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 8px 20px -6px rgba(6,110,150,.45)}
-.btn:hover{transform:translateY(-2px);box-shadow:0 12px 24px -6px rgba(6,110,150,.5)}
-.btn:active{transform:translateY(0)}
-.btn svg{width:18px;height:18px;flex-shrink:0}
-.lerr{display:none;background:var(--red-l);color:var(--red);border:1px solid #fca5a5;border-radius:var(--rs);padding:10px;font-size:12px;font-weight:600;text-align:center;margin-bottom:14px}
+/* ── LOGIN ── */
+#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%)}
+.lcard{background:#fff;padding:40px 32px;border-radius:20px;box-shadow:var(--sh-lg);width:100%;max-width:400px}
+.lcard-logo{text-align:center;margin-bottom:24px}
+.lcard-logo svg{width:48px;height:48px}
+.lcard-logo h2{font-size:20px;font-weight:800;margin-top:10px}
+.lcard-logo p{font-size:12px;color:var(--muted);margin-top:2px}
+.fg{margin-bottom:14px}
+.fg label{display:block;font-size:12px;font-weight:700;margin-bottom:5px}
+.fg input{width:100%;padding:11px 14px;border-radius:var(--rm);border:1.5px solid var(--border);font-size:13px;outline:none;transition:var(--tr);background:#f8fafc}
+.fg input:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-xl)}
+.btn{width:100%;padding:12px;background:var(--grad-brand);color:#fff;border:none;border-radius:var(--rm);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:var(--tr)}
+.btn:hover{opacity:.92;transform:translateY(-1px)}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.lerr{display:none;background:var(--red-l);color:var(--red);border-radius:var(--rs);padding:10px;font-size:12px;font-weight:600;text-align:center;margin-bottom:12px}
 
-#onboardPage{display:none;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:var(--grad-dark)}
-.ocard{background:#fff;padding:42px 34px;border-radius:20px;box-shadow:var(--sh-lg);width:100%;max-width:420px;text-align:center}
-.ocard-icon{width:64px;height:64px;background:var(--grad-brand);border-radius:18px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;box-shadow:0 10px 22px -6px rgba(6,110,150,.4)}
-.ocard-icon svg{width:30px;height:30px;color:#fff}
-.ocard h2{font-size:19px;font-weight:800;color:var(--dark);margin-bottom:8px}
-.ocard p{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.7}
-.hour-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
-.hour-btn{padding:12px 8px;border-radius:var(--rm);border:2px solid var(--border);background:#f8fafc;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:var(--tr);color:var(--text)}
-.hour-btn:hover{border-color:var(--teal);background:var(--teal-xl)}
-.hour-btn.selected{border-color:var(--teal);background:var(--grad-brand);color:#fff;box-shadow:0 6px 14px -4px rgba(6,110,150,.4)}
-.hour-sub{font-size:10px;opacity:.8;display:block;margin-top:2px}
+/* ── APP LAYOUT ── */
+#appPage{display:none;min-height:100vh}
+.app-header{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.hdr-left{display:flex;align-items:center;gap:10px}
+.hdr-logo{width:32px;height:32px;background:var(--grad-brand);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.hdr-logo svg{width:16px;height:16px;color:#fff}
+.hdr-info h1{font-size:13px;font-weight:700}
+.hdr-info p{font-size:10px;color:var(--muted)}
+.hdr-right{display:flex;align-items:center;gap:6px}
+.hdr-btn{background:#f8fafc;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:var(--rs);font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:var(--tr)}
+.hdr-btn:hover{background:var(--brand-xl);border-color:var(--brand)}
+.hdr-btn svg{width:13px;height:13px}
 
-#branchPage{display:none;min-height:100vh;background:var(--grad-dark);padding:48px 20px;position:relative;overflow:hidden}
-#branchPage::before{content:'';position:absolute;width:420px;height:420px;background:var(--teal);border-radius:50%;filter:blur(90px);opacity:.22;top:-160px;left:50%;transform:translateX(-50%);pointer-events:none}
-.branch-header{text-align:center;margin-bottom:32px;position:relative;z-index:1}
-.branch-header h2{font-size:23px;font-weight:800;color:#fff;margin-bottom:6px}
-.branch-header p{font-size:13px;color:#94a3b8}
-.branch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:900px;margin:0 auto;position:relative;z-index:1}
-.branch-card{background:rgba(255,255,255,.05);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.1);border-radius:var(--r);padding:26px 22px;cursor:pointer;transition:var(--tr);text-align:center}
-.branch-card:hover{background:rgba(0,188,212,.14);border-color:var(--teal);transform:translateY(-4px);box-shadow:0 16px 32px -10px rgba(0,188,212,.25)}
-.branch-card.all-card{background:rgba(0,188,212,.08);border-color:rgba(0,188,212,.3)}
-.branch-icon{width:50px;height:50px;background:rgba(0,188,212,.16);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
-.branch-icon svg{width:22px;height:22px;color:var(--teal)}
-.branch-name{font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:4px}
-.branch-loc{font-size:12px;color:#94a3b8;margin-bottom:14px}
-.branch-sales{font-size:21px;font-weight:800;background:linear-gradient(135deg,#22d3ee,#00BCD4);-webkit-background-clip:text;background-clip:text;color:transparent}
-.branch-sales-lbl{font-size:11px;color:#64748b;margin-top:2px}
+.app-body{display:flex;min-height:calc(100vh - 56px)}
 
-.topbar{background:linear-gradient(120deg,var(--dark),#0b1220);padding:0 24px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 2px 14px rgb(0 0 0/.22);border-bottom:1px solid rgba(255,255,255,.06)}
-.tb-left{display:flex;align-items:center;gap:11px}
-.tb-icon{width:36px;height:36px;background:var(--grad-brand);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:var(--tr)}
-.tb-icon:hover{transform:scale(1.06)}
-.tb-icon svg{width:18px;height:18px;color:#fff}
-.tb-name{font-size:14.5px;font-weight:700;color:#fff}
-.tb-tax{font-size:11px;color:#94a3b8;margin-top:1px}
-.tb-branch-tag{font-size:10px;background:rgba(0,188,212,.15);color:#4dd8ea;border:1px solid rgba(0,188,212,.3);padding:2px 9px;border-radius:99px;margin-top:3px;display:inline-block;font-weight:600}
-.tb-right{display:flex;align-items:center;gap:8px}
-.tb-btn{background:rgba(255,255,255,.07);border:1px solid transparent;color:#cbd5e1;padding:8px 13px;border-radius:var(--rs);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;transition:var(--tr);font-family:'Cairo',sans-serif;white-space:nowrap;min-height:38px}
-.tb-btn:hover{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.1)}
-.tb-btn svg{width:14px;height:14px}
+/* ── SIDEBAR ── */
+.sidebar{width:220px;background:#fff;border-left:1px solid var(--border);padding:16px 12px;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;flex-shrink:0}
+.sb-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding:0 8px}
+.sb-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--rm);cursor:pointer;transition:var(--tr);margin-bottom:4px;font-size:12px;font-weight:600;color:var(--text)}
+.sb-item:hover{background:#f8fafc}
+.sb-item.active{background:var(--brand-xl);color:var(--brand-d);border:1px solid rgba(0,188,212,.2)}
+.sb-item svg{width:14px;height:14px;flex-shrink:0}
+.sb-item .sb-sales{margin-right:auto;font-size:10px;color:var(--muted);font-weight:500}
+.sb-item.active .sb-sales{color:var(--brand-d)}
+.sb-all{border:1px dashed var(--border);background:#fafafa}
+.sb-all.active{background:var(--grad-brand);color:#fff;border-style:solid;border-color:transparent}
+.sb-all.active .sb-sales{color:rgba(255,255,255,.8)}
+.sb-status{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
 
-.wrap{max-width:1180px;margin:0 auto;padding:22px}
+/* ── MAIN ── */
+.main{flex:1;padding:20px;max-width:1100px}
 
-.sync-bar{background:var(--card);border:1px solid var(--border);border-radius:var(--rm);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;box-shadow:var(--sh);flex-wrap:wrap;gap:8px}
-.sync-info{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
-.sync-info svg{width:14px;height:14px;color:var(--teal);flex-shrink:0}
-.sync-info::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px var(--green-l);flex-shrink:0;animation:pulse-dot 2s ease-in-out infinite}
-.sync-stat{background:var(--teal-xl);color:var(--teal-d);font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px}
-.sync-now{background:none;border:1px solid var(--border);color:var(--muted);padding:6px 13px;border-radius:var(--rs);font-size:12px;font-weight:600;cursor:pointer;font-family:'Cairo',sans-serif;display:flex;align-items:center;gap:5px;transition:var(--tr);min-height:34px}
-.sync-now:hover{border-color:var(--teal);color:var(--teal-d);background:var(--teal-xl)}
-.sync-now svg{width:13px;height:13px}
-@keyframes pulse-dot{0%,100%{box-shadow:0 0 0 3px var(--green-l)}50%{box-shadow:0 0 0 5px var(--green-l)}}
+/* tabs */
+.tabs{display:flex;background:#fff;border:1px solid var(--border);border-radius:99px;padding:4px;gap:2px;margin-bottom:16px;width:fit-content;box-shadow:var(--sh)}
+.tab{padding:8px 18px;border-radius:99px;border:none;background:transparent;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:var(--tr);white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--grad-brand);color:#fff}
 
-.tabs{display:flex;background:var(--card);border:1px solid var(--border);border-radius:99px;padding:5px;gap:2px;margin-bottom:20px;box-shadow:var(--sh);width:fit-content;max-width:100%;overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none}
-.tabs::-webkit-scrollbar{display:none}
-.tab{font-size:13px;font-weight:700;padding:9px 20px;border-radius:99px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:var(--tr);font-family:'Cairo',sans-serif;white-space:nowrap;flex-shrink:0}
-.tab:hover{color:var(--teal-d)}
-.tab.active{background:var(--grad-brand);color:#fff;box-shadow:0 4px 12px -2px rgba(0,188,212,.4)}
+/* metrics */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.mc{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--sh);transition:var(--tr)}
+.mc:hover{box-shadow:var(--sh-md);border-color:rgba(0,188,212,.2)}
+.mc-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.mc-label{font-size:11px;font-weight:600;color:var(--muted)}
+.mc-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+.mc-ico svg{width:15px;height:15px}
+.mc-s .mc-ico{background:var(--green-l);color:var(--green)}
+.mc-r .mc-ico{background:var(--red-l);color:var(--red)}
+.mc-n .mc-ico{background:var(--brand-xl);color:var(--brand-d)}
+.mc-p .mc-ico{background:var(--amber-l);color:var(--amber)}
+.mc-i .mc-ico{background:var(--purple-l);color:var(--purple)}
+.mc-val{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.mc-foot{font-size:10px;color:var(--muted);margin-top:6px}
 
-.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:18px}
-.mc{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--sh);transition:var(--tr);position:relative;overflow:hidden}
-.mc:hover{transform:translateY(-3px);box-shadow:var(--sh-md);border-color:rgba(0,188,212,.25)}
-.mc::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
-.mc-s::after{background:linear-gradient(90deg,var(--green),#34d399)}.mc-r::after{background:linear-gradient(90deg,var(--red),#f87171)}.mc-n::after{background:linear-gradient(90deg,var(--teal),var(--teal-2))}.mc-p::after{background:linear-gradient(90deg,var(--amber),#fbbf24)}.mc-i::after{background:linear-gradient(90deg,var(--purple),#a78bfa)}.mc-sr::after{background:linear-gradient(90deg,#0891b2,#22d3ee)}
-.mc-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-.mc-label{font-size:12px;font-weight:700;color:var(--muted)}
-.mc-ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center}
-.mc-ico svg{width:17px;height:17px}
-.mc-s .mc-ico{background:var(--green-l);color:var(--green)}.mc-r .mc-ico{background:var(--red-l);color:var(--red)}
-.mc-n .mc-ico{background:var(--teal-xl);color:var(--teal-d)}.mc-p .mc-ico{background:var(--amber-l);color:var(--amber)}
-.mc-i .mc-ico{background:var(--purple-l);color:var(--purple)}.mc-sr .mc-ico{background:#cffafe;color:#0891b2}
-.mc-val{font-size:23px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-.mc-foot{font-size:11.5px;color:var(--muted);margin-top:9px}
+/* bottom panels */
+.row2{display:grid;grid-template-columns:1fr 1.5fr;gap:14px;margin-bottom:16px}
+.panel{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--sh)}
+.panel-title{font-size:12px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.panel-title svg{width:14px;height:14px;color:var(--brand)}
 
-.period-info{font-size:11.5px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:var(--rs);padding:7px 13px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
-.period-info svg{width:12px;height:12px;color:var(--teal);flex-shrink:0}
-
-.branch-compare{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--sh);margin-bottom:18px}
-.bc-title{font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:7px}
-.bc-title svg{width:16px;height:16px;color:var(--teal)}
-.bc-row{margin-bottom:14px}
-.bc-label{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:6px}
-.bc-bar-bg{height:9px;background:var(--bg);border-radius:99px;overflow:hidden}
-.bc-bar-fill{height:100%;border-radius:99px;transition:width .8s ease}
-
-.row2{display:grid;grid-template-columns:1fr 1.5fr;gap:16px;margin-bottom:18px}
-.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--sh)}
-.panel-title{font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:7px}
-.panel-title svg{width:16px;height:16px;color:var(--teal)}
-
-.pay-item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px dashed var(--border)}
+/* payments */
+.pay-item{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px dashed var(--border);font-size:12px}
 .pay-item:last-child{border:none}
-.pay-left{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600}
-.pay-dot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px -2px rgb(0 0 0/.25)}
-.pay-dot svg{width:13px;height:13px;color:#fff}
-.pay-val{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.pay-left{display:flex;align-items:center;gap:8px;font-weight:600}
+.pay-dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.pay-dot svg{width:11px;height:11px;color:#fff}
+.pay-val{font-weight:700;font-variant-numeric:tabular-nums}
 
-.rec-section-title{font-size:12px;font-weight:700;margin:10px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border)}
-.rec-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg);border-radius:var(--rs);border:1px solid var(--border);margin-bottom:6px;transition:var(--tr)}
-.rec-item:hover{background:#fff;border-color:rgba(0,188,212,.3);transform:translateX(-2px)}
-.rec-num{font-size:12px;font-weight:700}
-.rec-date{font-size:10px;color:var(--muted);margin-top:2px}
-.rec-badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;margin-left:4px}
-.rec-badge-s{background:var(--green-l);color:var(--green)}.rec-badge-r{background:var(--red-l);color:var(--red)}
-.rec-badge-p{background:var(--amber-l);color:var(--amber)}.rec-badge-sr{background:#cffafe;color:#0891b2}
-.rec-amt{font-size:12.5px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
-.clr-s{color:var(--green)}.clr-r{color:var(--red)}.clr-p{color:var(--amber)}.clr-sr{color:#0891b2}
-.no-data{font-size:12px;color:var(--muted);text-align:center;padding:14px}
+/* recent */
+.rec-item{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f8fafc;border-radius:var(--rs);margin-bottom:5px;font-size:11px;transition:var(--tr)}
+.rec-item:hover{background:var(--brand-xl)}
+.rec-num{font-weight:700}
+.rec-date{font-size:10px;color:var(--muted);margin-top:1px}
+.rec-badge{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:4px}
+.rec-badge-s{background:var(--green-l);color:var(--green)}
+.rec-badge-r{background:var(--red-l);color:var(--red)}
+.rec-badge-p{background:var(--amber-l);color:var(--amber)}
+.rec-amt{font-weight:700;font-variant-numeric:tabular-nums}
+.clr-s{color:var(--green)}.clr-r{color:var(--red)}.clr-p{color:var(--amber)}
+.no-data{font-size:11px;color:var(--muted);text-align:center;padding:12px}
 
-.tax-wrap{background:var(--grad-dark);border-radius:var(--r);padding:24px;margin-bottom:18px;border:1px solid rgba(0,188,212,.2);position:relative;overflow:hidden}
-.tax-wrap::before{content:'';position:absolute;width:260px;height:260px;background:var(--teal);border-radius:50%;filter:blur(80px);opacity:.18;top:-100px;left:-60px;pointer-events:none}
-.tax-head{font-size:14px;font-weight:700;color:#f8fafc;margin-bottom:18px;display:flex;align-items:center;gap:7px;position:relative;z-index:1}
-.tax-head svg{width:16px;height:16px;color:var(--teal)}
-.tax-grid{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;position:relative;z-index:1}
-.tax-node{padding:0 14px;border-left:1px solid rgba(255,255,255,.1)}
-.tax-node:last-child{border-left:none}
-.tax-lbl{font-size:11px;color:#94a3b8;margin-bottom:6px}
-.tax-val{font-size:17px;font-weight:700;color:#f1f5f9;font-variant-numeric:tabular-nums}
-.tax-val.due{color:#fbbf24;font-size:19px}
-.tax-foot{margin-top:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:relative;z-index:1}
-.prog-bg{flex:1;background:rgba(255,255,255,.1);height:7px;border-radius:99px;overflow:hidden;min-width:140px}
-.prog-fill{height:100%;background:linear-gradient(90deg,var(--teal),#4dd0e1);border-radius:99px;transition:width .6s}
-.prog-lbl{font-size:11px;color:#94a3b8;margin-top:6px}
-.btn-print{background:var(--grad-brand);color:#fff;border:none;padding:11px 18px;border-radius:var(--rs);font-size:12.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Cairo',sans-serif;transition:var(--tr);white-space:nowrap;min-height:42px;box-shadow:0 8px 18px -6px rgba(0,188,212,.45)}
-.btn-print:hover{transform:translateY(-2px);box-shadow:0 10px 22px -6px rgba(0,188,212,.5)}
-.btn-print svg{width:13px;height:13px}
+/* ── TAX QUARTER SECTION ── */
+.tax-section{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:16px;box-shadow:var(--sh)}
+.tax-head{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.tax-head svg{width:15px;height:15px;color:var(--brand)}
+.tax-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+.tax-node{text-align:center;padding:12px;background:#f8fafc;border-radius:var(--rm);border:1px solid var(--border)}
+.tax-lbl{font-size:10px;color:var(--muted);margin-bottom:4px}
+.tax-val{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.tax-val.due{color:var(--brand-d);font-size:18px}
+.tax-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.prog-bg{flex:1;background:var(--bg);height:6px;border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;background:var(--grad-brand);border-radius:99px;transition:width .5s}
+.prog-lbl{font-size:10px;color:var(--muted);margin-top:4px}
+.btn-print{background:var(--grad-brand);color:#fff;border:none;padding:9px 16px;border-radius:var(--rs);font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:var(--tr);white-space:nowrap}
+.btn-print:hover{opacity:.9}
+.btn-print svg{width:12px;height:12px}
 
-.modal{position:fixed;inset:0;background:rgba(4,7,13,.65);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;z-index:999;opacity:0;pointer-events:none;transition:opacity .22s;padding:20px}
+/* branch compare */
+.branch-cmp{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:16px;box-shadow:var(--sh)}
+.cmp-title{font-size:12px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.cmp-title svg{width:14px;height:14px;color:var(--brand)}
+.cmp-row{margin-bottom:10px}
+.cmp-label{display:flex;justify-content:space-between;font-size:11px;font-weight:600;margin-bottom:4px}
+.cmp-bar{height:7px;background:var(--bg);border-radius:99px;overflow:hidden}
+.cmp-fill{height:100%;border-radius:99px;transition:width .6s}
+
+/* sync bar */
+.sync-bar{background:#fff;border:1px solid var(--border);border-radius:var(--rm);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;box-shadow:var(--sh);font-size:11px;color:var(--muted)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-left:6px}
+.sync-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:var(--rs);font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px}
+.sync-btn:hover{border-color:var(--brand);color:var(--brand-d)}
+.sync-btn svg{width:11px;height:11px}
+
+/* ── MODAL ── */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s;padding:20px}
 .modal.on{opacity:1;pointer-events:auto}
-.mbox{background:#fff;width:100%;max-width:400px;border-radius:20px;box-shadow:var(--sh-lg);padding:28px;transform:scale(.95);transition:transform .22s}
-.modal.on .mbox{transform:scale(1)}
-.mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
-.mhead h3{font-size:15px;font-weight:700;display:flex;align-items:center;gap:7px}
-.mhead h3 svg{width:16px;height:16px;color:var(--teal)}
-.mclose{background:var(--bg);border:none;width:30px;height:30px;border-radius:9px;font-size:18px;color:var(--muted);cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;transition:var(--tr)}
+.mbox{background:#fff;width:100%;max-width:400px;border-radius:16px;box-shadow:var(--sh-lg);padding:24px}
+.mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.mhead h3{font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px}
+.mhead h3 svg{width:15px;height:15px;color:var(--brand)}
+.mclose{background:#f1f5f9;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .mclose:hover{background:var(--red-l);color:var(--red)}
-.merr{display:none;background:var(--red-l);color:var(--red);border:1px solid #fca5a5;border-radius:var(--rs);padding:9px;font-size:12px;font-weight:600;margin-bottom:12px;text-align:center}
-.msuc{display:none;background:var(--green-l);color:var(--green);border:1px solid #6ee7b7;border-radius:var(--rs);padding:9px;font-size:12px;font-weight:600;margin-bottom:12px;text-align:center}
+.merr{display:none;background:var(--red-l);color:var(--red);border-radius:var(--rs);padding:8px;font-size:11px;font-weight:600;margin-bottom:10px;text-align:center}
 
-.settings-section{margin-bottom:20px}
-.settings-label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
-.settings-row{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:var(--bg);border-radius:var(--rm);border:1px solid var(--border);margin-bottom:8px;cursor:pointer;transition:var(--tr);min-height:48px}
-.settings-row:hover{background:#fff;border-color:var(--teal)}
-.settings-row-left{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600}
-.settings-row-left svg{width:16px;height:16px;color:var(--teal)}
-.settings-row-right{font-size:12px;color:var(--muted)}
-.wa-btn{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;border:none;width:100%;min-height:48px;padding:12px;border-radius:var(--rm);font-size:14px;font-weight:700;cursor:pointer;font-family:'Cairo',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:var(--tr);margin-top:4px;box-shadow:0 8px 18px -6px rgba(37,211,102,.4)}
-.wa-btn:hover{transform:translateY(-2px)}
-.wa-btn svg{width:18px;height:18px}
-
-.loader{text-align:center;padding:36px;color:var(--muted);font-size:13px}
-.loader svg{width:24px;height:24px;color:var(--teal);display:block;margin:0 auto 8px;animation:spin 1s linear infinite}
-.foot{font-size:11px;color:var(--muted);text-align:center;padding:18px 0;border-top:1px solid var(--border);margin-top:6px}
-
-@keyframes spin{to{transform:rotate(360deg)}}
-@media(max-width:768px){.row2{grid-template-columns:1fr!important}.tax-grid{grid-template-columns:1fr;gap:16px}.tax-node{border-left:none;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:14px}.tax-node:last-child{border-bottom:none}}
-@media(max-width:600px){
-  .topbar{height:auto;min-height:60px;padding:12px 14px;flex-direction:column;gap:10px;align-items:center;padding-top:calc(12px + env(safe-area-inset-top))}
-  .tb-left{width:100%;justify-content:center;text-align:center}
-  .tb-right{width:100%;justify-content:center;flex-wrap:wrap;gap:6px}
-  .tb-btn{padding:7px 11px;font-size:11px}
-  .wrap{padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
-  .mgrid{grid-template-columns:repeat(2,1fr)}
-  .tabs{width:100%;justify-content:flex-start}
-  .tab{padding:8px 14px;font-size:12px}
-  .mc{padding:16px}
-  .mc-val{font-size:20px}
-  .sync-bar{padding:10px 12px}
-  .lcard,.ocard{padding:32px 22px}
-}
-@media(max-width:380px){.mgrid{grid-template-columns:1fr}}
-
+/* ── PRINT ── */
 #printDoc{display:none}
 @media print{
-  html,body{height:auto!important;overflow:auto!important}
-  body>*:not(#printDoc){display:none!important}
-  #printDoc{display:block!important;direction:rtl;font-family:'Cairo',sans-serif;color:#000}
-  .pd-page{padding:12mm 10mm;max-width:210mm;margin:0 auto;page-break-after:always}
-  .pd-page:last-child{page-break-after:auto}
-  .pd-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid #000;padding-bottom:10px;margin-bottom:14px}
-  .pd-logo-area h1{font-size:15px;font-weight:800}
-  .pd-logo-area p{font-size:11px;color:#475569;margin-top:2px}
-  .pd-badge{display:inline-block;background:#e0f7fa;color:#0097a7;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid #b2ebf2;margin-top:4px}
-  .pd-meta{text-align:left;font-size:10px;color:#475569;line-height:1.7}
-  .pd-entity{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .pd-entity-row strong{color:#475569;display:block;font-size:10px;margin-bottom:1px}
-  .pd-entity-row span{color:#000;font-weight:600;font-size:11px}
-  .pd-section-title{font-size:13px;font-weight:800;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:10px;margin-top:14px}
-  .pd-summary-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:12px 14px;margin-bottom:12px}
-  .pd-summary-row{display:flex;justify-content:space-between;font-size:11px;padding:5px 0;border-bottom:1px solid #f1f5f9}
-  .pd-summary-row:last-child{border-bottom:none;font-weight:800;font-size:13px;padding-top:8px;color:#0097a7}
-  .pd-table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:10.5px}
-  .pd-table th{background:#1A2332;color:#fff;padding:7px 8px;text-align:right;font-weight:700;font-size:10px}
-  .pd-table td{padding:7px 8px;border-bottom:1px solid #e2e8f0;text-align:right}
-  .pd-table tr:nth-child(even) td{background:#f8fafc}
-  .pd-table tr.sep td{background:#e0f7fa;font-weight:700;border-top:2px solid #00bcd4;border-bottom:2px solid #00bcd4}
-  .pd-table tr.total td{background:#1A2332;color:#fff;font-weight:800;font-size:11px}
-  .pd-footer{text-align:center;font-size:9.5px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px;display:flex;justify-content:space-between}
+  body{background:#fff!important}
+  #appPage,#loginPage,.modal{display:none!important}
+  #printDoc{display:block!important}
+  @page{size:A4;margin:15mm}
+  .print-wrap{max-width:210mm;margin:0 auto;font-family:'Cairo',sans-serif;color:#0f172a;direction:rtl}
+  .print-header{text-align:center;border-bottom:2px solid #00BCD4;padding-bottom:12px;margin-bottom:16px}
+  .print-header h1{font-size:18px;font-weight:800;margin-bottom:4px}
+  .print-header p{font-size:11px;color:#64748b}
+  .print-table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  .print-table th,.print-table td{padding:8px 12px;border:1px solid #e2e8f0;font-size:12px;text-align:right}
+  .print-table th{background:#f1f5f9;font-weight:700}
+  .print-table td{font-variant-numeric:tabular-nums}
+  .print-total{font-size:14px;font-weight:800;color:#0891B2;text-align:center;margin-top:12px}
+  .print-footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:8px}
+}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  .app-header{padding:0 12px;height:50px}
+  .hdr-info h1{font-size:11px}
+  .hdr-info p{font-size:9px}
+  .hdr-btn{padding:6px 8px;font-size:10px}
+  .hdr-btn span{display:none}
+  .app-body{flex-direction:column}
+  .sidebar{width:100%;position:relative;top:0;height:auto;border-left:none;border-bottom:1px solid var(--border);padding:10px 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .sb-title{display:none}
+  .sb-item{margin-bottom:0;padding:7px 10px;font-size:11px}
+  .sb-all{border:none;background:transparent}
+  .sb-all .sb-item{border:1px dashed var(--border);border-radius:var(--rm)}
+  .sb-all.active .sb-item{border-style:solid;border-color:transparent}
+  .main{padding:12px}
+  .tabs{width:100%;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .tab{flex-shrink:0}
+  .mgrid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .mc-val{font-size:16px}
+  .row2{grid-template-columns:1fr}
+  .tax-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
 
+<!-- ══════════ LOGIN PAGE ══════════ -->
 <div id="loginPage">
   <div class="lcard">
     <div class="lcard-logo">
-      <svg viewBox="0 0 52 52" fill="none"><rect width="52" height="52" rx="12" fill="#1A2332"/><path d="M14 26h24M14 18h24M14 34h16" stroke="#00BCD4" stroke-width="2.5" stroke-linecap="round"/><circle cx="40" cy="34" r="5" fill="#00BCD4"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="#00BCD4" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
       <h2>المحاسب الذكي</h2>
-      <p>Smart Accountant — Powered by Mhmd.acs</p>
+      <p>نظام إدارة المبيعات والفواتير</p>
     </div>
-    <div class="lerr" id="lerr"></div>
-    <form onsubmit="doLogin(event)">
-      <div class="fg"><label>الرقم الضريبي</label><input type="text" id="lu" placeholder="أدخل الرقم الضريبي" required autocomplete="username"></div>
-      <div class="fg"><label>كلمة المرور</label><input type="password" id="lp" placeholder="رقم الواتساب المسجل" required autocomplete="current-password"></div>
-      <button type="submit" class="btn" id="lbtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-        دخول النظام
-      </button>
-    </form>
-  </div>
-</div>
-
-<div id="onboardPage" style="display:flex">
-  <div class="ocard" style="display:none" id="ocard">
-    <div class="ocard-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <div class="fg">
+      <label>اسم المستخدم</label>
+      <input type="text" id="loginUser" placeholder="أدخل اسم المستخدم" autocomplete="username">
     </div>
-    <h2>مرحباً بك في المحاسب الذكي</h2>
-    <p>لنبدأ بضبط وقت إغلاق نشاطك التجاري حتى تكون التقارير دقيقة ومنظمة يومياً</p>
-    <div class="hour-grid" id="hourGrid"></div>
-    <button class="btn" onclick="saveCloseHour()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-      حفظ وبدء الاستخدام
+    <div class="fg">
+      <label>كلمة المرور</label>
+      <input type="password" id="loginPass" placeholder="أدخل كلمة المرور" autocomplete="current-password">
+    </div>
+    <div class="lerr" id="loginErr">بيانات الدخول غير صحيحة</div>
+    <button class="btn" id="loginBtn" onclick="doLogin()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+      تسجيل الدخول
     </button>
   </div>
 </div>
 
-<div id="branchPage">
-  <div class="branch-header">
-    <svg viewBox="0 0 52 52" fill="none" style="width:48px;height:48px;margin-bottom:12px"><rect width="52" height="52" rx="12" fill="rgba(0,188,212,.15)"/><path d="M14 26h24M14 18h24M14 34h16" stroke="#00BCD4" stroke-width="2.5" stroke-linecap="round"/><circle cx="40" cy="34" r="5" fill="#00BCD4"/></svg>
-    <h2 id="branchTitle">—</h2>
-    <p id="branchSubtitle">اختر الفرع لعرض بياناته</p>
-  </div>
-  <div class="branch-grid" id="branchGrid"></div>
-</div>
-
-<div id="dashPage" style="display:none">
-  <div class="topbar">
-    <div class="tb-left">
-      <div class="tb-icon" onclick="goToBranches()" title="الفروع">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+<!-- ══════════ APP PAGE ══════════ -->
+<div id="appPage">
+  <div class="app-header">
+    <div class="hdr-left">
+      <div class="hdr-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
       </div>
-      <div>
-        <div class="tb-name" id="tbName">—</div>
-        <div class="tb-tax" id="tbTax">—</div>
-        <div class="tb-branch-tag" id="tbBranch" style="display:none"></div>
+      <div class="hdr-info">
+        <h1 id="hdrStore">—</h1>
+        <p id="hdrTax">—</p>
       </div>
     </div>
-    <div class="tb-right">
-      <button class="tb-btn" onclick="showModal('settingsModal')">
+    <div class="hdr-right">
+      <button class="hdr-btn" onclick="openSettings()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        إعدادات
+        <span>إعدادات</span>
       </button>
-      <button class="tb-btn" onclick="doLogout()">
+      <button class="hdr-btn" onclick="doLogout()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-        خروج
+        <span>خروج</span>
       </button>
     </div>
   </div>
 
-  <div class="wrap">
-    <div class="sync-bar">
-      <div class="sync-info">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        <span id="syncInfo">جاري التحميل...</span>
-        <span class="sync-stat" id="syncCount" style="display:none"></span>
-      </div>
-      <button class="sync-now" onclick="refreshData()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-        تحديث
-      </button>
-    </div>
-
-    <div class="period-info" id="periodInfo" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <span id="periodInfoText">—</span>
-    </div>
-
-    <div class="tabs">
-      <button class="tab active" id="tab-today" onclick="switchTab('today',this)">مبيعاتك الحالية</button>
-      <button class="tab" id="tab-yesterday" onclick="switchTab('yesterday',this)">مبيعاتك السابقة</button>
-      <button class="tab" id="tab-month" onclick="switchTab('month',this)">الشهر</button>
-      <button class="tab" id="tab-quarter" onclick="switchTab('quarter',this)">الربع الحالي</button>
-    </div>
-
-    <div id="metricsArea"><div class="loader"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>جاري التحميل...</div></div>
-
-    <div class="branch-compare" id="branchCompare" style="display:none">
-      <div class="bc-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-        مقارنة المبيعات بين الفروع
-      </div>
-      <div id="branchCompareRows"></div>
-    </div>
-
-    <div class="row2" id="bottomSection" style="display:none">
-      <div class="panel">
-        <div class="panel-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
-          قنوات الدفع
+  <div class="app-body">
+    <div class="sidebar" id="sidebar">
+      <div class="sb-title">الفروع</div>
+      <div id="branchList"></div>
+      <div class="sb-all" id="sbAllWrap">
+        <div class="sb-item" id="sbAll" onclick="selectBranch(null)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          جميع الفروع
+          <span class="sb-sales" id="sbAllSales">—</span>
         </div>
-        <div id="payArea"></div>
-      </div>
-      <div class="panel" id="recentPanel">
-        <div class="panel-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          آخر العمليات
-        </div>
-        <div id="recentArea"></div>
       </div>
     </div>
 
-    <div class="tax-wrap" id="taxBanner" style="display:none">
-      <div class="tax-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        خلاصة الوضع الضريبي — <span id="taxPeriodLbl">الربع الحالي</span>
-      </div>
-      <div class="tax-grid">
-        <div class="tax-node"><div class="tax-lbl">ضريبة المبيعات الصافية</div><div class="tax-val" id="tSales">—</div></div>
-        <div class="tax-node"><div class="tax-lbl">ضريبة المشتريات (مدخلات)</div><div class="tax-val" id="tPur">—</div></div>
-        <div class="tax-node"><div class="tax-lbl">المستحق للهيئة (تقريبي)</div><div class="tax-val due" id="tDue">—</div></div>
-      </div>
-      <div class="tax-foot">
-        <div style="flex:1">
-          <div class="prog-bg"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
-          <div class="prog-lbl" id="progLbl">—</div>
-        </div>
-        <button class="btn-print" onclick="doPrint()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          طباعة الإقرار / PDF
+    <div class="main">
+      <div class="sync-bar">
+        <div><span class="sync-dot"></span> <span id="syncInfo">—</span></div>
+        <button class="sync-btn" onclick="refreshData()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+          تحديث
         </button>
       </div>
-    </div>
 
-    <div class="foot">Powered by Mhmd.acs © 2026</div>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('today',this)">اليوم</button>
+        <button class="tab" onclick="switchTab('yesterday',this)">أمس</button>
+        <button class="tab" onclick="switchTab('month',this)">الشهر</button>
+        <button class="tab" onclick="switchTab('quarter',this)">الربع</button>
+      </div>
+
+      <div id="metricsArea"></div>
+
+      <div class="row2" id="bottomSection">
+        <div class="panel">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            قنوات الدفع
+          </div>
+          <div id="payArea"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            آخر العمليات
+          </div>
+          <div id="recentArea"></div>
+        </div>
+      </div>
+
+      <div class="tax-section" id="taxSection">
+        <div class="tax-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          الإقرار الضريبي — <span id="taxPeriodLbl">الربع الحالي</span>
+        </div>
+        <div class="tax-grid">
+          <div class="tax-node">
+            <div class="tax-lbl">ضريبة المبيعات</div>
+            <div class="tax-val" id="tSales">—</div>
+          </div>
+          <div class="tax-node">
+            <div class="tax-lbl">ضريبة المشتريات</div>
+            <div class="tax-val" id="tPur">—</div>
+          </div>
+          <div class="tax-node">
+            <div class="tax-lbl">المستحق للهيئة</div>
+            <div class="tax-val due" id="tDue">—</div>
+          </div>
+        </div>
+        <div class="tax-foot">
+          <div style="flex:1">
+            <div class="prog-bg"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+            <div class="prog-lbl" id="progLbl">—</div>
+          </div>
+          <button class="btn-print" onclick="doPrint()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            طباعة الإقرار
+          </button>
+        </div>
+      </div>
+
+      <div class="branch-cmp" id="branchCmp" style="display:none">
+        <div class="cmp-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          مقارنة الفروع
+        </div>
+        <div id="cmpRows"></div>
+      </div>
+    </div>
   </div>
 </div>
 
-<div class="modal" id="settingsModal" onclick="if(event.target===this)hideModal('settingsModal')">
+<!-- ══════════ SETTINGS MODAL ══════════ -->
+<div class="modal" id="settingsModal">
   <div class="mbox">
     <div class="mhead">
       <h3>
@@ -412,591 +366,512 @@ button{-webkit-appearance:none}
       <button class="mclose" onclick="hideModal('settingsModal')">&times;</button>
     </div>
 
-    <div class="settings-section">
-      <div class="settings-label">وقت النشاط التجاري</div>
-      <div class="settings-row" onclick="showModal('closeHourModal');hideModal('settingsModal')">
-        <div class="settings-row-left">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          وقت إغلاق النشاط
-        </div>
-        <div class="settings-row-right" id="settingsCloseHourLbl">—</div>
+    <div class="fg">
+      <label>وقت إغلاق النشاط (ساعة 0-23)</label>
+      <input type="number" id="setHour" min="0" max="23" value="0">
+    </div>
+    <button class="btn" onclick="saveCloseHour()" style="margin-bottom:16px">حفظ وقت الإغلاق</button>
+
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+        كلمة المرور الحالية: <strong id="pwStatus">—</strong>
       </div>
+      <div class="fg">
+        <label>كلمة مرور جديدة (6 أحرف على الأقل)</label>
+        <input type="password" id="pw1">
+      </div>
+      <div class="fg">
+        <label>تأكيد كلمة المرور</label>
+        <input type="password" id="pw2">
+      </div>
+      <div class="merr" id="pwErr"></div>
+      <div class="msuc" id="pwSuc" style="display:none;background:var(--green-l);color:var(--green);border-radius:var(--rs);padding:8px;font-size:11px;font-weight:600;margin-bottom:10px;text-align:center"></div>
+      <button class="btn" onclick="changePw()">تغيير كلمة المرور</button>
     </div>
 
-    <div class="settings-section">
-      <div class="settings-label">الحساب</div>
-      <div class="settings-row" onclick="showModal('pwModal');hideModal('settingsModal')">
-        <div class="settings-row-left">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          تغيير كلمة المرور
-        </div>
-        <div class="settings-row-right">←</div>
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div class="settings-label">الدعم الفني</div>
-      <button class="wa-btn" onclick="openSupport()">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
+      <button class="btn" onclick="openSupport()" style="background:linear-gradient(135deg,#25D366,#128C7E)">
         تواصل مع الدعم الفني
       </button>
     </div>
   </div>
 </div>
 
-<div class="modal" id="closeHourModal" onclick="if(event.target===this)hideModal('closeHourModal')">
-  <div class="mbox">
-    <div class="mhead">
-      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>وقت إغلاق النشاط</h3>
-      <button class="mclose" onclick="hideModal('closeHourModal')">&times;</button>
+<!-- ══════════ ONBOARD MODAL ══════════ -->
+<div class="modal" id="onboardModal">
+  <div class="mbox" style="text-align:center">
+    <h3 style="justify-content:center;margin-bottom:8px">مرحباً بك!</h3>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">حدد وقت إغلاق نشاطك التجاري</p>
+    <div class="fg">
+      <label>ساعة الإغلاق (0-23)</label>
+      <input type="number" id="onboardHour" min="0" max="23" value="0">
     </div>
-    <p style="font-size:13px;color:var(--muted);margin-bottom:16px">حدد الوقت الذي يُغلق فيه محلك عادةً — يُستخدم لتقسيم الفترات تلقائياً</p>
-    <div class="hour-grid" id="hourGridModal"></div>
-    <div class="msuc" id="chSuc"></div>
-    <button class="btn" onclick="saveCloseHourModal()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-      حفظ
-    </button>
+    <button class="btn" onclick="saveOnboard()">بدء الاستخدام</button>
   </div>
 </div>
 
-<div class="modal" id="pwModal" onclick="if(event.target===this)hideModal('pwModal')">
-  <div class="mbox">
-    <div class="mhead">
-      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>تغيير كلمة المرور</h3>
-      <button class="mclose" onclick="hideModal('pwModal')">&times;</button>
-    </div>
-    <div class="merr" id="pwErr"></div>
-    <div class="msuc" id="pwSuc"></div>
-    <div class="fg"><label>كلمة المرور الجديدة</label><input type="password" id="pw1" placeholder="6 أحرف أو أرقام على الأقل"></div>
-    <div class="fg"><label>تأكيد كلمة المرور</label><input type="password" id="pw2" placeholder="أعد الإدخال"></div>
-    <button class="btn" onclick="changePw()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-      حفظ
-    </button>
-  </div>
-</div>
-
+<!-- ══════════ PRINT DOCUMENT ══════════ -->
 <div id="printDoc"></div>
 
+<!-- ══════════ JAVASCRIPT ══════════ -->
 <script>
-// ── STATE ────────────────────────────────────────────────────────────────────
-let TOKEN='', STORE='', TAX_NUM='';
-let BRANCHES=[], CURRENT_TENANT='', CURRENT_BRANCH_NAME='';
-let CLOSE_HOUR=0, ONBOARDED=false;
-let SUPPORT_WA='966558110150';
-let lastQuarterData=null, currentTab='today';
-let selectedHour=0;
+/* ── STATE ── */
+var TOKEN = '';
+var STORE = '';
+var TAX_NUM = '';
+var BRANCHES = [];
+var CURRENT_BRANCH = null;
+var CLOSE_HOUR = 0;
+var ONBOARDED = false;
+var SUPPORT_WA = '';
+var HAS_CUSTOM_PW = false;
+var lastQuarterData = null;
+var currentTab = 'today';
 
-// ── #9 — XSS escape helper ───────────────────────────────────────────────────
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
-  '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-}[c]));
+var API = '/api/portal';
 
-// ── CLOSE HOUR OPTIONS ────────────────────────────────────────────────────────
-const HOUR_OPTIONS=[
-  {h:22,label:'10:00 مساءً',sub:'22:00'},
-  {h:23,label:'11:00 مساءً',sub:'23:00'},
-  {h:0, label:'منتصف الليل',sub:'00:00'},
-  {h:1, label:'1:00 صباحاً',sub:'01:00'},
-  {h:2, label:'2:00 صباحاً',sub:'02:00'},
-  {h:6, label:'6:00 صباحاً',sub:'06:00'},
-];
-
-function hourLabel(h){
-  const o=HOUR_OPTIONS.find(x=>x.h===h);
-  return o?o.label:(h<12?`${h}:00 صباحاً`:`${h===12?12:h-12}:00 مساءً`);
+/* ── HELPERS ── */
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  return Number(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
-function buildHourGrid(containerId,currentH){
-  const el=document.getElementById(containerId);
-  if(!el)return;
-  // #10 — تمرير event صراحة
-  el.innerHTML=HOUR_OPTIONS.map(o=>`
-    <button class="hour-btn${o.h===currentH?' selected':''}"
-            onclick="selectHour(${o.h},'${containerId}',event)">
-      ${esc(o.label)}<span class="hour-sub">${esc(o.sub)}</span>
-    </button>`).join('');
-}
-function selectHour(h,containerId,ev){
-  selectedHour=h;
-  document.querySelectorAll(`#${containerId} .hour-btn`)
-    .forEach(b=>b.classList.remove('selected'));
-  ev.currentTarget.classList.add('selected');
+function showModal(id) { document.getElementById(id).classList.add('on'); }
+function hideModal(id) { document.getElementById(id).classList.remove('on'); }
+
+function apiHeaders() {
+  var h = {'Content-Type': 'application/json'};
+  if (TOKEN) h['Authorization'] = 'Bearer ' + TOKEN;
+  return h;
 }
 
-// ── FORMAT ───────────────────────────────────────────────────────────────────
-const fmt=n=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' ر.س';
-const fmtN=n=>Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-const round2=n=>Math.round(n*100)/100;
-function fmtDate(s){if(!s)return'—';try{return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});}catch{return s;}}
-function fmtDateTime(s){if(!s)return'—';try{return new Date(s).toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch{return s;}}
-function nowStr(){return new Date().toLocaleString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
-
-// ── LOGIN ─────────────────────────────────────────────────────────────────────
-async function doLogin(e){
-  e.preventDefault();
-  const btn=document.getElementById('lbtn');
-  btn.disabled=true;
-  btn.innerHTML=`<svg style="animation:spin 1s linear infinite;width:14px;height:14px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> جاري الدخول...`;
-  document.getElementById('lerr').style.display='none';
-  try{
-    const r=await fetch('/api/portal/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:document.getElementById('lu').value.trim(),password:document.getElementById('lp').value.trim()})});
-    const d=await r.json();
-    if(!r.ok)throw new Error(d.detail||'بيانات الدخول غير صحيحة');
-    TOKEN=d.token; STORE=d.store_name; TAX_NUM=d.tax_number;
-    BRANCHES=d.branches||[]; CLOSE_HOUR=d.close_hour||0; ONBOARDED=d.onboarded||false;
-    SUPPORT_WA=d.support_wa||SUPPORT_WA;
-
-    if(!ONBOARDED){showOnboarding();}
-    else if(BRANCHES.length>1){showBranchPage();}
-    else{CURRENT_TENANT=BRANCHES[0]?.tenant_id||'';CURRENT_BRANCH_NAME='';showDash();}
-  }catch(ex){
-    const err=document.getElementById('lerr');
-    err.textContent=ex.message; err.style.display='block';
-  }finally{
-    btn.disabled=false;
-    btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> دخول النظام`;
-  }
-}
-function doLogout(){
-  TOKEN=STORE=TAX_NUM=''; BRANCHES=[]; CURRENT_TENANT=''; CLOSE_HOUR=0; ONBOARDED=false;
-  ['dashPage','branchPage'].forEach(id=>document.getElementById(id).style.display='none');
-  document.getElementById('loginPage').style.display='flex';
-  document.getElementById('onboardPage').style.display='none';
-  document.getElementById('lp').value='';
+function tenantParam() {
+  return CURRENT_BRANCH ? '&tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : '';
 }
 
-// ── ONBOARDING ────────────────────────────────────────────────────────────────
-function showOnboarding(){
-  document.getElementById('loginPage').style.display='none';
-  const op=document.getElementById('onboardPage');
-  op.style.display='flex';
-  document.getElementById('ocard').style.display='block';
-  selectedHour=CLOSE_HOUR;
-  buildHourGrid('hourGrid',CLOSE_HOUR);
-}
-async function saveCloseHour(){
-  await _saveHour(selectedHour);
-  CLOSE_HOUR=selectedHour; ONBOARDED=true;
-  document.getElementById('onboardPage').style.display='none';
-  if(BRANCHES.length>1)showBranchPage();
-  else{CURRENT_TENANT=BRANCHES[0]?.tenant_id||'';CURRENT_BRANCH_NAME='';showDash();}
-}
+/* ── LOGIN ── */
+function doLogin() {
+  var u = document.getElementById('loginUser').value.trim();
+  var p = document.getElementById('loginPass').value;
+  var errEl = document.getElementById('loginErr');
+  var btn = document.getElementById('loginBtn');
+  errEl.style.display = 'none';
+  if (!u || !p) { errEl.textContent = 'يرجى إدخال اسم المستخدم وكلمة المرور'; errEl.style.display = 'block'; return; }
+  btn.disabled = true;
+  btn.textContent = 'جاري الدخول...';
 
-// ── BRANCH PAGE (#9 — escape كل المحتوى الديناميكي) ──────────────────────────
-function showBranchPage(){
-  document.getElementById('loginPage').style.display='none';
-  document.getElementById('dashPage').style.display='none';
-  document.getElementById('onboardPage').style.display='none';
-  document.getElementById('branchPage').style.display='block';
-  document.getElementById('branchTitle').textContent=STORE;
-  document.getElementById('branchSubtitle').textContent='الرقم الضريبي: '+TAX_NUM;
+  fetch(API + '/auth/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username: u, password: p})
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('login failed');
+    return r.json();
+  })
+  .then(function(d) {
+    TOKEN = d.token;
+    STORE = d.store_name || '';
+    TAX_NUM = d.tax_number || '';
+    CLOSE_HOUR = d.close_hour || 0;
+    ONBOARDED = !!d.onboarded;
+    SUPPORT_WA = d.support_wa || '';
+    HAS_CUSTOM_PW = !!d.has_custom_password;
+    BRANCHES = d.branches || [];
 
-  const grid=document.getElementById('branchGrid');
-  grid.innerHTML='';
+    document.getElementById('hdrStore').textContent = STORE;
+    document.getElementById('hdrTax').textContent = 'الرقم الضريبي: ' + TAX_NUM;
 
-  // بطاقة لكل فرع — بدون inline onclick، مع escape كامل
-  BRANCHES.forEach(b=>{
-    const loc=[b.city,b.city_subdivision].filter(Boolean).join(' — ');
-    const card=document.createElement('div');
-    card.className='branch-card';
-    card.innerHTML=`
-      <div class="branch-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
-      <div class="branch-name">${esc(b.store_name||'فرع')}</div>
-      <div class="branch-loc">${esc(loc||'—')}</div>
-      <div class="branch-sales">${fmt(b.today_sales)}</div>
-      <div class="branch-sales-lbl">مبيعات الفترة الحالية</div>`;
-    card.addEventListener('click',()=>selectBranch(b.tenant_id,b.store_name||'فرع'));
-    grid.appendChild(card);
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('appPage').style.display = 'block';
+
+    renderSidebar();
+    selectBranch(null);
+
+    if (!ONBOARDED) {
+      showModal('onboardModal');
+    }
+  })
+  .catch(function() {
+    errEl.textContent = 'بيانات الدخول غير صحيحة';
+    errEl.style.display = 'block';
+  })
+  .finally(function() {
+    btn.disabled = false;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg> تسجيل الدخول';
   });
-
-  // بطاقة "جميع الفروع"
-  const allCard=document.createElement('div');
-  allCard.className='branch-card all-card';
-  allCard.innerHTML=`
-    <div class="branch-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
-    <div class="branch-name">جميع الفروع</div>
-    <div class="branch-loc">${BRANCHES.length} فروع مجمّعة</div>
-    <div class="branch-sales">${fmt(BRANCHES.reduce((s,b)=>s+(b.today_sales||0),0))}</div>
-    <div class="branch-sales-lbl">إجمالي الفترة الحالية</div>`;
-  allCard.addEventListener('click',()=>selectBranch('all','جميع الفروع'));
-  grid.appendChild(allCard);
-}
-function selectBranch(tid,name){
-  CURRENT_TENANT=tid==='all'?'':tid;
-  CURRENT_BRANCH_NAME=tid==='all'?'جميع الفروع':name;
-  showDash();
-}
-function goToBranches(){if(BRANCHES.length>1)showBranchPage();}
-
-// ── DASHBOARD ─────────────────────────────────────────────────────────────────
-function showDash(){
-  ['loginPage','branchPage','onboardPage'].forEach(id=>document.getElementById(id).style.display='none');
-  document.getElementById('dashPage').style.display='block';
-  document.getElementById('tbName').textContent=STORE||'—';
-  document.getElementById('tbTax').textContent='الرقم الضريبي: '+(TAX_NUM||'—');
-  const bt=document.getElementById('tbBranch');
-  if(CURRENT_BRANCH_NAME&&BRANCHES.length>1){bt.textContent=CURRENT_BRANCH_NAME;bt.style.display='inline-block';}
-  else bt.style.display='none';
-  document.getElementById('settingsCloseHourLbl').textContent=hourLabel(CLOSE_HOUR);
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('tab-today').classList.add('active');
-  switchTab('today',document.getElementById('tab-today'));
 }
 
-// ── API ───────────────────────────────────────────────────────────────────────
-async function api(url){
-  const sep=url.includes('?')?'&':'?';
-  const full=CURRENT_TENANT?url+sep+'tenant_id='+CURRENT_TENANT:url;
-  const r=await fetch(full,{headers:{'Authorization':'Bearer '+TOKEN}});
-  if(r.status===401){doLogout();throw new Error('انتهت الجلسة');}
-  const d=await r.json();
-  if(!r.ok)throw new Error(d.detail||'خطأ');
-  return d;
+/* ── LOGOUT ── */
+function doLogout() {
+  TOKEN = '';
+  STORE = '';
+  TAX_NUM = '';
+  BRANCHES = [];
+  CURRENT_BRANCH = null;
+  document.getElementById('appPage').style.display = 'none';
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
 }
 
-// ── TABS ──────────────────────────────────────────────────────────────────────
-async function switchTab(tab,btn){
-  currentTab=tab;
-  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-  if(btn)btn.classList.add('active');
-  document.getElementById('metricsArea').innerHTML='<div class="loader"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>جاري التحميل...</div>';
-  document.getElementById('taxBanner').style.display='none';
-  document.getElementById('bottomSection').style.display='none';
-  document.getElementById('branchCompare').style.display='none';
-  document.getElementById('periodInfo').style.display='none';
-  try{
-    if(tab==='today')await loadDay(0);
-    else if(tab==='yesterday')await loadDay(-1);
-    else if(tab==='month')await loadPeriod('month');
-    else await loadPeriod('quarter');
-    document.getElementById('bottomSection').style.display='grid';
-    if(tab!=='quarter')await loadRecent(tab==='yesterday'?-1:0);
-    await updateSyncBar();
-  }catch(e){
-    document.getElementById('metricsArea').innerHTML=`<div class="loader">⚠️ ${esc(e.message)}</div>`;
+/* ── SIDEBAR ── */
+function renderSidebar() {
+  var list = document.getElementById('branchList');
+  var html = '';
+  var totalSales = 0;
+  for (var i = 0; i < BRANCHES.length; i++) {
+    var b = BRANCHES[i];
+    var sales = b.today_sales || 0;
+    totalSales += sales;
+    var dotColor = b.is_active ? 'var(--green)' : 'var(--muted)';
+    html += '<div class="sb-item" data-branch="' + b.device_id + '" onclick="selectBranch(\'' + b.device_id + '\')">'
+      + '<span class="sb-status" style="background:' + dotColor + '"></span>'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
+      + b.branch_name
+      + '<span class="sb-sales">' + fmt(sales) + '</span>'
+      + '</div>';
   }
-}
-function refreshData(){switchTab(currentTab,document.getElementById('tab-'+currentTab));}
-
-// ── DAY ───────────────────────────────────────────────────────────────────────
-async function loadDay(offset){
-  const d=await api('/api/portal/day?offset='+offset);
-  const lbl=offset===0?'الفترة الحالية':'الفترة السابقة';
-  const pi=document.getElementById('periodInfo');
-  const s=fmtDateTime(d.period_start), e=fmtDateTime(d.period_end);
-  document.getElementById('periodInfoText').textContent=`${lbl}: من ${s} حتى ${e}`;
-  pi.style.display='flex';
-
-  renderMetrics([
-    {cls:'mc-s', icon:ICO.up,   label:'إجمالي المبيعات',   val:fmt(d.sales),        foot:`${d.sales_count||0} فاتورة`},
-    {cls:'mc-r', icon:ICO.down, label:'مرتجعات العملاء',    val:fmt(d.refund),       foot:'مبالغ مستردة'},
-    {cls:'mc-n', icon:ICO.net,  label:'صافي المبيعات',      val:fmt(d.net_sales),    foot:'بعد خصم المرتجع'},
-    {cls:'mc-p', icon:ICO.cart, label:'المشتريات',           val:fmt(d.purchases),    foot:`${d.purchases_count||0} فاتورة`},
-    {cls:'mc-sr',icon:ICO.ret,  label:'مرتجع المشتريات',    val:fmt(d.stock_return), foot:'إرجاع للموردين'},
-    {cls:'mc-i', icon:ICO.coin, label:'صافي الدخل',          val:fmt(d.net_income),   foot:'مبيعات - مشتريات'},
-  ]);
-  renderPayments(d.payment_breakdown||{});
+  list.innerHTML = html;
+  document.getElementById('sbAllSales').textContent = fmt(totalSales);
+  updateSidebarActive();
 }
 
-// ── PERIOD ────────────────────────────────────────────────────────────────────
-async function loadPeriod(period){
-  const d=await api('/api/portal/'+period);
-  if(period==='quarter')lastQuarterData=d;
-  renderMetrics([
-    {cls:'mc-s', icon:ICO.up,   label:'إجمالي المبيعات',  val:fmt(d.sales),         foot:`${d.sales_count||''} فاتورة`},
-    {cls:'mc-r', icon:ICO.down, label:'المرتجعات',         val:fmt(d.refund),        foot:`${d.refund_count||''} إشعار`},
-    {cls:'mc-n', icon:ICO.net,  label:'صافي المبيعات',     val:fmt(d.net_sales),     foot:'شامل الضريبة'},
-    {cls:'mc-p', icon:ICO.cart, label:'المشتريات',          val:fmt(d.purchases),     foot:`${d.purchases_count||''} فاتورة`},
-    {cls:'mc-sr',icon:ICO.ret,  label:'مرتجع المشتريات',   val:fmt(d.stock_return||0),foot:'إرجاع للموردين'},
-  ]);
-  renderPayments(d.payment_breakdown||{});
-  if(period==='quarter'){
-    document.getElementById('tSales').textContent=fmt(d.tax_sales);
-    document.getElementById('tPur').textContent=fmt(d.tax_purchases);
-    document.getElementById('tDue').textContent=fmt(d.vat_due);
-    document.getElementById('taxPeriodLbl').textContent=d.period_label||'الربع الحالي';
-    document.getElementById('progFill').style.width=(d.quarter_progress||0)+'%';
-    document.getElementById('progLbl').textContent=`${d.quarter_progress||0}% من الربع مضى — ${d.days_remaining||0} يوم متبقي لتقديم الإقرار`;
-    document.getElementById('taxBanner').style.display='block';
-    buildPrintSummary(d);
+function updateSidebarActive() {
+  var items = document.querySelectorAll('#branchList .sb-item');
+  for (var i = 0; i < items.length; i++) {
+    var bid = items[i].getAttribute('data-branch');
+    items[i].classList.toggle('active', bid === CURRENT_BRANCH);
   }
-  if(!CURRENT_TENANT&&BRANCHES.length>1&&d.branch_breakdown?.length){
+  document.getElementById('sbAllWrap').classList.toggle('active', CURRENT_BRANCH === null);
+}
+
+function selectBranch(deviceId) {
+  CURRENT_BRANCH = deviceId;
+  updateSidebarActive();
+  refreshData();
+}
+
+/* ── TABS ── */
+function switchTab(tab, el) {
+  currentTab = tab;
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  if (el) el.classList.add('active');
+  loadTabData();
+}
+
+/* ── DATA LOADING ── */
+function refreshData() {
+  loadTabData();
+  loadQuarterData();
+  loadSyncStatus();
+  loadRecent();
+}
+
+function loadTabData() {
+  if (currentTab === 'today') loadDay(0);
+  else if (currentTab === 'yesterday') loadDay(-1);
+  else if (currentTab === 'month') loadMonth();
+  else if (currentTab === 'quarter') loadQuarterTab();
+}
+
+function loadDay(offset) {
+  fetch(API + '/day?offset=' + offset + tenantParam(), {headers: apiHeaders()})
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    renderDayMetrics(d);
+    renderPayments(d.payment_breakdown);
+  })
+  .catch(function() {});
+}
+
+function loadMonth() {
+  fetch(API + '/month' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    renderMonthMetrics(d);
+    renderPayments(d.payment_breakdown);
     renderBranchCompare(d.branch_breakdown);
+  })
+  .catch(function() {});
+}
+
+function loadQuarterTab() {
+  fetch(API + '/quarter' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    renderQuarterMetrics(d);
+    renderPayments(d.payment_breakdown);
+    renderBranchCompare(d.branch_breakdown);
+  })
+  .catch(function() {});
+}
+
+function loadQuarterData() {
+  fetch(API + '/quarter' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    lastQuarterData = d;
+    document.getElementById('tSales').textContent = fmt(d.tax_sales);
+    document.getElementById('tPur').textContent = fmt(d.tax_purchases);
+    document.getElementById('tDue').textContent = fmt(d.vat_due);
+    document.getElementById('taxPeriodLbl').textContent = d.period_label || 'الربع الحالي';
+    var prog = d.quarter_progress || 0;
+    document.getElementById('progFill').style.width = prog + '%';
+    document.getElementById('progLbl').textContent = 'تقدم الربع: ' + Math.round(prog) + '%' + (d.days_remaining ? ' — متبقي ' + d.days_remaining + ' يوم' : '');
+  })
+  .catch(function() {});
+}
+
+function loadSyncStatus() {
+  fetch(API + '/sync-status' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    var info = 'آخر مستند: ' + (d.last_doc_date || '—') + ' | الفواتير: ' + (d.total_invoices || 0);
+    if (d.devices) info += ' | الأجهزة: ' + d.devices;
+    document.getElementById('syncInfo').textContent = info;
+  })
+  .catch(function() {});
+}
+
+function loadRecent() {
+  fetch(API + '/recent?offset=0' + tenantParam(), {headers: apiHeaders()})
+  .then(function(r) { return r.json(); })
+  .then(function(d) { renderRecent(d); })
+  .catch(function() {});
+}
+
+/* ── RENDERERS ── */
+function renderDayMetrics(d) {
+  var html = '<div class="mgrid">'
+    + metricCard('mc-s', 'المبيعات', fmt(d.sales), (d.sales_count || 0) + ' فاتورة', salesIcon())
+    + metricCard('mc-r', 'المرتجعات', fmt(d.refund), '', refundIcon())
+    + metricCard('mc-n', 'صافي المبيعات', fmt(d.net_sales), '', netIcon())
+    + metricCard('mc-p', 'المشتريات', fmt(d.purchases), (d.purchases_count || 0) + ' عملية', purchaseIcon())
+    + metricCard('mc-r', 'مرتجع المخزون', fmt(d.stock_return), '', returnIcon())
+    + metricCard('mc-i', 'صافي الدخل', fmt(d.net_income), '', incomeIcon())
+    + '</div>';
+  document.getElementById('metricsArea').innerHTML = html;
+}
+
+function renderMonthMetrics(d) {
+  var html = '<div class="mgrid">'
+    + metricCard('mc-s', 'المبيعات', fmt(d.sales), '', salesIcon())
+    + metricCard('mc-r', 'المرتجعات', fmt(d.refund), '', refundIcon())
+    + metricCard('mc-n', 'صافي المبيعات', fmt(d.net_sales), '', netIcon())
+    + metricCard('mc-p', 'المشتريات', fmt(d.purchases), '', purchaseIcon())
+    + metricCard('mc-r', 'مرتجع المخزون', fmt(d.stock_return), '', returnIcon())
+    + '</div>';
+  document.getElementById('metricsArea').innerHTML = html;
+}
+
+function renderQuarterMetrics(d) {
+  var html = '<div class="mgrid">'
+    + metricCard('mc-s', 'المبيعات', fmt(d.sales), '', salesIcon())
+    + metricCard('mc-r', 'المرتجعات', fmt(d.refund), '', refundIcon())
+    + metricCard('mc-n', 'صافي المبيعات', fmt(d.net_sales), '', netIcon())
+    + metricCard('mc-p', 'المشتريات', fmt(d.purchases), '', purchaseIcon())
+    + metricCard('mc-r', 'مرتجع المخزون', fmt(d.stock_return), '', returnIcon())
+    + '</div>';
+  document.getElementById('metricsArea').innerHTML = html;
+}
+
+function metricCard(cls, label, val, foot, ico) {
+  return '<div class="mc ' + cls + '">'
+    + '<div class="mc-head"><span class="mc-label">' + label + '</span><div class="mc-ico">' + ico + '</div></div>'
+    + '<div class="mc-val">' + val + '</div>'
+    + (foot ? '<div class="mc-foot">' + foot + '</div>' : '')
+    + '</div>';
+}
+
+function salesIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>'; }
+function refundIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>'; }
+function netIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>'; }
+function purchaseIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>'; }
+function returnIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>'; }
+function incomeIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'; }
+
+function renderPayments(pb) {
+  var area = document.getElementById('payArea');
+  if (!pb || !Object.keys(pb).length) { area.innerHTML = '<div class="no-data">لا توجد بيانات</div>'; return; }
+  var colors = {'cash':'#10b981','card':'#8b5cf6','transfer':'#00BCD4','credit':'#f59e0b'};
+  var labels = {'cash':'نقدي','card':'بطاقة','transfer':'تحويل','credit':'آجل'};
+  var html = '';
+  var keys = Object.keys(pb);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var c = colors[k] || '#64748b';
+    var lbl = labels[k] || k;
+    html += '<div class="pay-item">'
+      + '<div class="pay-left"><div class="pay-dot" style="background:' + c + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>' + lbl + '</div>'
+      + '<div class="pay-val">' + fmt(pb[k]) + '</div>'
+      + '</div>';
+  }
+  area.innerHTML = html;
+}
+
+function renderRecent(d) {
+  var area = document.getElementById('recentArea');
+  var items = [];
+  if (d.sales) for (var i = 0; i < d.sales.length; i++) items.push({type:'s', num: d.sales[i].invoice_number, date: d.sales[i].invoice_date, amt: d.sales[i].total_with_tax, method: d.sales[i].payment_method});
+  if (d.refunds) for (var i = 0; i < d.refunds.length; i++) items.push({type:'r', num: d.refunds[i].invoice_number, date: d.refunds[i].invoice_date, amt: d.refunds[i].total_with_tax});
+  if (d.purchases) for (var i = 0; i < d.purchases.length; i++) items.push({type:'p', num: d.purchases[i].invoice_number, date: d.purchases[i].invoice_date, amt: d.purchases[i].total_with_tax});
+  if (d.stock_returns) for (var i = 0; i < d.stock_returns.length; i++) items.push({type:'p', num: d.stock_returns[i].invoice_number, date: d.stock_returns[i].invoice_date, amt: d.stock_returns[i].total_with_tax});
+
+  if (!items.length) { area.innerHTML = '<div class="no-data">لا توجد عمليات حديثة</div>'; return; }
+
+  items.sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+  items = items.slice(0, 10);
+
+  var html = '';
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var badgeCls = it.type === 's' ? 'rec-badge-s' : (it.type === 'r' ? 'rec-badge-r' : 'rec-badge-p');
+    var badgeTxt = it.type === 's' ? 'بيع' : (it.type === 'r' ? 'مرتجع' : 'مشتري');
+    var clr = it.type === 's' ? 'clr-s' : (it.type === 'r' ? 'clr-r' : 'clr-p');
+    html += '<div class="rec-item">'
+      + '<div><div class="rec-num">' + (it.num || '—') + '<span class="rec-badge ' + badgeCls + '">' + badgeTxt + '</span></div>'
+      + '<div class="rec-date">' + (it.date || '') + '</div></div>'
+      + '<div class="rec-amt ' + clr + '">' + fmt(it.amt) + '</div>'
+      + '</div>';
+  }
+  area.innerHTML = html;
+}
+
+function renderBranchCompare(bb) {
+  var cmp = document.getElementById('branchCmp');
+  var rows = document.getElementById('cmpRows');
+  if (!bb || !bb.length || CURRENT_BRANCH !== null) { cmp.style.display = 'none'; return; }
+  cmp.style.display = 'block';
+  var max = 0;
+  for (var i = 0; i < bb.length; i++) if (bb[i].total > max) max = bb[i].total;
+  var colors = ['#00BCD4','#10b981','#8b5cf6','#f59e0b','#ef4444','#0891B2'];
+  var html = '';
+  for (var i = 0; i < bb.length; i++) {
+    var pct = max > 0 ? (bb[i].total / max * 100) : 0;
+    var c = colors[i % colors.length];
+    html += '<div class="cmp-row">'
+      + '<div class="cmp-label"><span>' + bb[i].branch_name + '</span><span>' + fmt(bb[i].total) + '</span></div>'
+      + '<div class="cmp-bar"><div class="cmp-fill" style="width:' + pct + '%;background:' + c + '"></div></div>'
+      + '</div>';
+  }
+  rows.innerHTML = html;
+}
+
+/* ── SETTINGS ── */
+function openSettings() {
+  document.getElementById('setHour').value = CLOSE_HOUR;
+  document.getElementById('pwStatus').textContent = HAS_CUSTOM_PW ? 'كلمة مرور مخصصة' : 'رقم الجوال';
+  document.getElementById('pw1').value = '';
+  document.getElementById('pw2').value = '';
+  document.getElementById('pwErr').style.display = 'none';
+  document.getElementById('pwSuc').style.display = 'none';
+  showModal('settingsModal');
+}
+
+function saveCloseHour() {
+  var h = parseInt(document.getElementById('setHour').value);
+  if (isNaN(h) || h < 0 || h > 23) { alert('يرجى إدخال رقم صحيح بين 0 و 23'); return; }
+  fetch(API + '/settings/close-hour', {
+    method: 'POST',
+    headers: apiHeaders(),
+    body: JSON.stringify({close_hour: h})
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('fail');
+    CLOSE_HOUR = h;
+    hideModal('settingsModal');
+  })
+  .catch(function() { alert('حدث خطأ في الحفظ'); });
+}
+
+function changePw() {
+  var p1 = document.getElementById('pw1').value;
+  var p2 = document.getElementById('pw2').value;
+  var errEl = document.getElementById('pwErr');
+  var sucEl = document.getElementById('pwSuc');
+  errEl.style.display = 'none';
+  sucEl.style.display = 'none';
+
+  if (!p1 || p1.length < 6) { errEl.textContent = 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'; errEl.style.display = 'block'; return; }
+  if (p1 !== p2) { errEl.textContent = 'كلمتا المرور غير متطابقتين'; errEl.style.display = 'block'; return; }
+
+  fetch(API + '/auth/change-password', {
+    method: 'POST',
+    headers: apiHeaders(),
+    body: JSON.stringify({new_password: p1})
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('fail');
+    HAS_CUSTOM_PW = true;
+    document.getElementById('pwStatus').textContent = 'كلمة مرور مخصصة';
+    sucEl.textContent = 'تم تغيير كلمة المرور بنجاح';
+    sucEl.style.display = 'block';
+    document.getElementById('pw1').value = '';
+    document.getElementById('pw2').value = '';
+  })
+  .catch(function() { errEl.textContent = 'حدث خطأ في تغيير كلمة المرور'; errEl.style.display = 'block'; });
+}
+
+function openSupport() {
+  if (SUPPORT_WA) {
+    var num = SUPPORT_WA.replace(/[^0-9]/g, '');
+    window.open('https://wa.me/' + num, '_blank');
   }
 }
 
-// ── BRANCH COMPARE ────────────────────────────────────────────────────────────
-function renderBranchCompare(data){
-  const max=Math.max(...data.map(b=>b.sales||0),1);
-  const colors=['#00BCD4','#10b981','#8b5cf6','#f59e0b','#ef4444'];
-  document.getElementById('branchCompareRows').innerHTML=data.map((b,i)=>`
-    <div class="bc-row">
-      <div class="bc-label"><span>${esc(b.name)}</span><span style="font-weight:800;color:${colors[i%colors.length]}">${fmt(b.sales)}</span></div>
-      <div class="bc-bar-bg"><div class="bc-bar-fill" style="width:${Math.round(b.sales/max*100)}%;background:${colors[i%colors.length]}"></div></div>
-    </div>`).join('');
-  document.getElementById('branchCompare').style.display='block';
+/* ── ONBOARD ── */
+function saveOnboard() {
+  var h = parseInt(document.getElementById('onboardHour').value);
+  if (isNaN(h) || h < 0 || h > 23) { alert('يرجى إدخال رقم صحيح بين 0 و 23'); return; }
+  fetch(API + '/settings/close-hour', {
+    method: 'POST',
+    headers: apiHeaders(),
+    body: JSON.stringify({close_hour: h})
+  })
+  .then(function(r) {
+    if (!r.ok) throw new Error('fail');
+    CLOSE_HOUR = h;
+    ONBOARDED = true;
+    hideModal('onboardModal');
+  })
+  .catch(function() { alert('حدث خطأ في الحفظ'); });
 }
 
-// ── METRICS ───────────────────────────────────────────────────────────────────
-function renderMetrics(cards){
-  document.getElementById('metricsArea').innerHTML=`<div class="mgrid">${cards.map(c=>`
-    <div class="mc ${c.cls}">
-      <div class="mc-header"><span class="mc-label">${esc(c.label)}</span><div class="mc-ico">${c.icon}</div></div>
-      <div class="mc-val">${c.val}</div>
-      <div class="mc-foot">${esc(c.foot)}</div>
-    </div>`).join('')}</div>`;
+/* ── PRINT ── */
+function doPrint() {
+  if (!lastQuarterData) { alert('لا توجد بيانات ضريبية'); return; }
+  var d = lastQuarterData;
+  var html = '<div class="print-wrap">'
+    + '<div class="print-header">'
+    + '<h1>' + STORE + '</h1>'
+    + '<p>الرقم الضريبي: ' + TAX_NUM + '</p>'
+    + '<p>' + (d.period_label || 'الربع الحالي') + '</p>'
+    + '</div>'
+    + '<table class="print-table">'
+    + '<thead><tr><th>البند</th><th>القيمة</th></tr></thead>'
+    + '<tbody>'
+    + '<tr><td>المبيعات الخاضعة للضريبة</td><td>' + fmt(d.tax_sales) + '</td></tr>'
+    + '<tr><td>ضريبة المبيعات (15%)</td><td>' + fmt(d.tax_sales) + '</td></tr>'
+    + '<tr><td>المشتريات الخاضعة للضريبة</td><td>' + fmt(d.tax_purchases) + '</td></tr>'
+    + '<tr><td>ضريبة المشتريات (15%)</td><td>' + fmt(d.tax_purchases) + '</td></tr>'
+    + '<tr><td><strong>صافي المستحق للهيئة</strong></td><td><strong>' + fmt(d.vat_due) + '</strong></td></tr>'
+    + '</tbody></table>'
+    + '<div class="print-total">المستحق للهيئة: ' + fmt(d.vat_due) + ' ر.س</div>'
+    + '<div class="print-footer">تم إنشاء هذا التقرير بواسطة نظام المحاسب الذكي</div>'
+    + '</div>';
+  document.getElementById('printDoc').innerHTML = html;
+  window.print();
 }
 
-// ── PAYMENTS ──────────────────────────────────────────────────────────────────
-const PAY_COLORS=['#00BCD4','#10b981','#8b5cf6','#f59e0b','#ef4444','#3b82f6'];
-function renderPayments(pb){
-  const keys=Object.keys(pb);
-  if(!keys.length){document.getElementById('payArea').innerHTML='<div class="no-data">لا توجد بيانات</div>';return;}
-  document.getElementById('payArea').innerHTML=keys.map((k,i)=>`
-    <div class="pay-item">
-      <div class="pay-left">
-        <div class="pay-dot" style="background:${PAY_COLORS[i%PAY_COLORS.length]}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>
-        </div>
-        <span>${esc(k)}</span>
-      </div>
-      <div class="pay-val">${fmt(pb[k])}</div>
-    </div>`).join('');
-}
-
-// ── RECENT ────────────────────────────────────────────────────────────────────
-async function loadRecent(offset=0){
-  const rp=document.getElementById('recentPanel');
-  if(currentTab==='quarter'){rp.style.display='none';return;}
-  rp.style.display='block';
-  try{
-    const d=await api('/api/portal/recent?offset='+offset);
-    const sales=d.sales||[], refunds=d.refunds||[],
-          purchases=d.purchases||[], stockReturns=d.stock_returns||[];
-
-    if(currentTab==='today'||currentTab==='yesterday'){
-      let combined=[
-        ...sales.map(x=>({...x,cls:'clr-s',badge:'بيع',bc:'rec-badge-s',sign:'+'})),
-        ...refunds.map(x=>({...x,cls:'clr-r',badge:'مرتجع عميل',bc:'rec-badge-r',sign:'-'})),
-        ...purchases.map(x=>({...x,cls:'clr-p',badge:'شراء',bc:'rec-badge-p',sign:'-'})),
-        ...stockReturns.map(x=>({...x,cls:'clr-sr',badge:'مرتجع مورد',bc:'rec-badge-sr',sign:'+'})),
-      ];
-      combined.sort((a,b)=>new Date(b.invoice_date)-new Date(a.invoice_date));
-      document.getElementById('recentArea').innerHTML=combined.slice(0,12).map(x=>`
-        <div class="rec-item">
-          <div>
-            <div class="rec-num"><span class="rec-badge ${x.bc}">${esc(x.badge)}</span>${esc(x.invoice_number||'—')}</div>
-            <div class="rec-date">${fmtDateTime(x.invoice_date)}</div>
-          </div>
-          <div class="rec-amt ${x.cls}">${x.sign}${fmt(x.total_with_tax)}</div>
-        </div>`).join('')||'<div class="no-data">لا توجد عمليات</div>';
-    } else {
-      const mk=(arr,cls,sign,title,color)=>`
-        <div class="rec-section-title" style="color:${color}">${title}</div>
-        ${arr.length?arr.slice(0,5).map(x=>`
-          <div class="rec-item">
-            <div><div class="rec-num">${esc(x.invoice_number||'—')}</div><div class="rec-date">${fmtDate(x.invoice_date)}</div></div>
-            <div class="rec-amt ${cls}">${sign}${fmt(x.total_with_tax)}</div>
-          </div>`).join(''):'<div class="no-data">لا توجد بيانات</div>'}`;
-      document.getElementById('recentArea').innerHTML=
-        mk(sales,'clr-s','+','▲ آخر المبيعات','var(--green)')+
-        mk(refunds,'clr-r','-','▼ آخر مرتجعات العملاء','var(--red)')+
-        mk(purchases,'clr-p','-','■ آخر المشتريات','var(--amber)')+
-        mk(stockReturns,'clr-sr','+','◆ آخر مرتجعات الموردين','#0891b2');
-    }
-  }catch{document.getElementById('recentArea').innerHTML='<div class="no-data">خطأ في التحميل</div>';}
-}
-
-// ── SYNC BAR ──────────────────────────────────────────────────────────────────
-async function updateSyncBar(){
-  try{
-    const d=await api('/api/portal/sync-status');
-    const last=d.last_doc_date?fmtDateTime(d.last_doc_date):'—';
-    document.getElementById('syncInfo').textContent='آخر مزامنة: '+last;
-    if(d.total_invoices){
-      document.getElementById('syncCount').textContent=d.total_invoices+' فاتورة';
-      document.getElementById('syncCount').style.display='inline-block';
-    }
-  }catch{document.getElementById('syncInfo').textContent='تعذر جلب حالة المزامنة';}
-}
-
-// ── CLOSE HOUR SETTINGS (#3 — تحديث التوكن) ──────────────────────────────────
-async function _saveHour(h){
-  const r=await fetch('/api/portal/settings/close-hour',{method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
-    body:JSON.stringify({close_hour:h})});
-  if(!r.ok)throw new Error('فشل حفظ الساعة');
-  const d=await r.json();
-  if(d.token) TOKEN=d.token;   // ← مهم: استبدال التوكن بالجديد
-  return d;
-}
-function showCloseHourModal(){
-  selectedHour=CLOSE_HOUR;
-  buildHourGrid('hourGridModal',CLOSE_HOUR);
-  document.getElementById('chSuc').style.display='none';
-}
-async function saveCloseHourModal(){
-  try{
-    await _saveHour(selectedHour);
-    CLOSE_HOUR=selectedHour;
-    document.getElementById('settingsCloseHourLbl').textContent=hourLabel(CLOSE_HOUR);
-    const s=document.getElementById('chSuc');
-    s.textContent='✅ تم الحفظ'; s.style.display='block';
-    setTimeout(()=>{s.style.display='none';hideModal('closeHourModal');},1200);
-    refreshData();
-  }catch(e){
-    const s=document.getElementById('chSuc');
-    s.textContent='⚠️ '+e.message; s.style.display='block';
-    s.style.background='var(--red-l)'; s.style.color='var(--red)';
-  }
-}
-
-// ── SUPPORT ───────────────────────────────────────────────────────────────────
-function openSupport(){
-  const msg=encodeURIComponent(`مرحباً، أنا ${STORE}\nالرقم الضريبي: ${TAX_NUM}\nأحتاج مساعدة في: `);
-  window.open(`https://wa.me/${SUPPORT_WA}?text=${msg}`,'_blank');
-}
-
-// ── PRINT ─────────────────────────────────────────────────────────────────────
-function buildPrintSummary(d){
-  const today=new Date(), year=today.getFullYear();
-  const q=d.period_label||'الربع الحالي';
-  const qm=q.includes('الأول')?{s:'01',e:'03/31'}:q.includes('الثاني')?{s:'04',e:'06/30'}:q.includes('الثالث')?{s:'07',e:'09/30'}:{s:'10',e:'12/31'};
-  const fromTo=`${qm.s}/01/${year} — ${qm.e}/${year}`;
-  const sB=round2(d.sales/1.15), rB=round2(d.refund/1.15), pB=round2(d.purchases/1.15);
-  const tS=round2(d.sales-sB), tR=round2(d.refund-rB), tP=round2(d.purchases-pB);
-  const nB=round2(sB-rB), nT=round2(tS-tR), due=round2(nT-tP);
-
-  document.getElementById('printDoc').innerHTML=`
-  <div class="pd-page">
-    <div class="pd-header">
-      <div class="pd-logo-area">
-        <h1>تقرير الإقرار الضريبي ربع السنوي</h1>
-        <p>${esc(q)} — السنة المالية ${year}</p>
-        <span class="pd-badge">المحاسب الذكي — Powered by Mhmd.acs</span>
-      </div>
-      <div class="pd-meta">
-        <div>تاريخ الإعداد: ${today.toLocaleDateString('en-GB')}</div>
-        <div>وقت الطباعة: ${nowStr()}</div>
-        <div>الحالة: مسودة للمراجعة</div>
-      </div>
-    </div>
-    <div class="pd-section-title">بيانات المنشأة</div>
-    <div class="pd-entity">
-      <div class="pd-entity-row"><strong>اسم المنشأة</strong><span>${esc(STORE)}</span></div>
-      <div class="pd-entity-row"><strong>الرقم الضريبي</strong><span>${esc(TAX_NUM)}</span></div>
-      <div class="pd-entity-row"><strong>الفترة الضريبية</strong><span>${esc(q)} ${year}</span></div>
-      <div class="pd-entity-row"><strong>تواريخ الفترة</strong><span>${fromTo}</span></div>
-    </div>
-    <div class="pd-section-title">ملخص الإقرار الضريبي</div>
-    <div class="pd-summary-box">
-      <div class="pd-summary-row"><span>إجمالي المبيعات (شامل الضريبة)</span><span>${fmtN(d.sales)} ر.س</span></div>
-      <div class="pd-summary-row"><span>المبيعات قبل الضريبة</span><span>${fmtN(sB)} ر.س</span></div>
-      <div class="pd-summary-row"><span>ضريبة المبيعات (15%)</span><span>${fmtN(tS)} ر.س</span></div>
-      <div class="pd-summary-row"><span>إجمالي المرتجعات</span><span>-${fmtN(d.refund)} ر.س</span></div>
-      <div class="pd-summary-row"><span>ضريبة المرتجعات</span><span>-${fmtN(tR)} ر.س</span></div>
-      <div class="pd-summary-row"><span>إجمالي المشتريات (شامل الضريبة)</span><span>${fmtN(d.purchases)} ر.س</span></div>
-      <div class="pd-summary-row"><span>ضريبة المدخلات (15%)</span><span>${fmtN(tP)} ر.س</span></div>
-      <div class="pd-summary-row"><span>صافي ضريبة المبيعات</span><span>${fmtN(nT)} ر.س</span></div>
-      <div class="pd-summary-row"><strong>صافي الضريبة المستحقة للهيئة</strong><strong>${fmtN(due)} ر.س</strong></div>
-    </div>
-    <div class="pd-section-title">التفاصيل المالية</div>
-    <table class="pd-table">
-      <thead><tr><th>البند</th><th>قبل الضريبة (ر.س)</th><th>ضريبة 15% (ر.س)</th><th>الإجمالي (ر.س)</th></tr></thead>
-      <tbody>
-        <tr><td>إجمالي المبيعات</td><td>${fmtN(sB)}</td><td>${fmtN(tS)}</td><td>${fmtN(d.sales)}</td></tr>
-        <tr><td>إجمالي المرتجعات</td><td>-${fmtN(rB)}</td><td>-${fmtN(tR)}</td><td>-${fmtN(d.refund)}</td></tr>
-        <tr class="sep"><td>صافي المبيعات الخاضعة</td><td>${fmtN(nB)}</td><td>${fmtN(nT)}</td><td>${fmtN(d.net_sales)}</td></tr>
-        <tr><td>إجمالي المشتريات (مدخلات)</td><td>${fmtN(pB)}</td><td>${fmtN(tP)}</td><td>${fmtN(d.purchases)}</td></tr>
-        <tr class="total"><td colspan="2">صافي الضريبة المستحقة للربع</td><td colspan="2" style="color:#fbbf24">${fmtN(due)} ر.س</td></tr>
-      </tbody>
-    </table>
-    <div class="pd-footer">
-      <span>المحاسب الذكي — Powered by Mhmd.acs © ${year}</span>
-      <span>${nowStr()}</span>
-    </div>
-  </div>`;
-}
-
-async function doPrint(){
-  if(!lastQuarterData)await loadPeriod('quarter');
-  try{
-    const details=await api('/api/portal/quarter-details');
-    appendPrintDetails(lastQuarterData,details);
-  }catch(e){console.warn('تفاصيل الطباعة:',e.message);}
-  setTimeout(()=>window.print(),200);
-}
-
-function appendPrintDetails(d,details){
-  const year=new Date().getFullYear(), q=d.period_label||'الربع الحالي';
-  const mk=(title,rows,cols)=>`
-    <div class="pd-page">
-      <div class="pd-header">
-        <div class="pd-logo-area"><h1>${esc(title)}</h1><p>${esc(q)} — ${year}</p><span class="pd-badge">${esc(STORE)} — ${esc(TAX_NUM)}</span></div>
-        <div class="pd-meta"><div>${nowStr()}</div></div>
-      </div>
-      <table class="pd-table">
-        <thead><tr>${cols.map(c=>`<th>${esc(c.l)}</th>`).join('')}</tr></thead>
-        <tbody>${rows.length?rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c.k]!=null?esc(r[c.k]):'—'}</td>`).join('')}</tr>`).join(''):`<tr><td colspan="${cols.length}" style="text-align:center;color:#94a3b8">لا توجد بيانات</td></tr>`}</tbody>
-      </table>
-      <div class="pd-footer"><span>المحاسب الذكي — Powered by Mhmd.acs © ${year}</span><span>${nowStr()}</span></div>
-    </div>`;
-
-  const existing=document.getElementById('printDoc').innerHTML;
-  document.getElementById('printDoc').innerHTML=existing
-    +mk('تفاصيل المبيعات',details.sales||[],[
-      {l:'التاريخ والوقت',k:'invoice_date'},{l:'رقم المستند',k:'invoice_number'},
-      {l:'الإجمالي (ر.س)',k:'total'},{l:'الضريبة (ر.س)',k:'tax'},{l:'طريقة الدفع',k:'payment_method'}])
-    +mk('تفاصيل مرتجعات العملاء',details.refunds||[],[
-      {l:'التاريخ والوقت',k:'invoice_date'},{l:'رقم المستند',k:'invoice_number'},
-      {l:'الإجمالي (ر.س)',k:'total'},{l:'طريقة الدفع',k:'payment_method'}])
-    +mk('تفاصيل المشتريات',details.purchases||[],[
-      {l:'التاريخ والوقت',k:'invoice_date'},{l:'رقم المستند',k:'invoice_number'},
-      {l:'رقم مرجعي',k:'ref_number'},{l:'المورد',k:'supplier'},
-      {l:'الرقم الضريبي للمورد',k:'supplier_tax'},{l:'الإجمالي (ر.س)',k:'total'},{l:'الضريبة (ر.س)',k:'tax'}])
-    +mk('تفاصيل مرتجعات الموردين',details.stock_returns||[],[
-      {l:'التاريخ والوقت',k:'invoice_date'},{l:'رقم المستند',k:'invoice_number'},
-      {l:'المورد',k:'supplier'},{l:'الرقم الضريبي',k:'supplier_tax'},{l:'الإجمالي (ر.س)',k:'total'}]);
-}
-
-// ── CHANGE PW ─────────────────────────────────────────────────────────────────
-async function changePw(){
-  const p1=document.getElementById('pw1').value.trim();
-  const p2=document.getElementById('pw2').value.trim();
-  const err=document.getElementById('pwErr'), suc=document.getElementById('pwSuc');
-  err.style.display='none'; suc.style.display='none';
-  if(!p1||p1!==p2){err.textContent='كلمتا المرور غير متطابقتان';err.style.display='block';return;}
-  if(p1.length<6){err.textContent='يجب أن تكون 6 أحرف على الأقل';err.style.display='block';return;}
-  try{
-    const r=await fetch('/api/portal/auth/change-password',{method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},
-      body:JSON.stringify({new_password:p1})});
-    const d=await r.json();
-    if(r.ok){suc.textContent='✅ تم تغيير كلمة المرور';suc.style.display='block';
-      document.getElementById('pw1').value='';document.getElementById('pw2').value='';}
-    else{err.textContent=d.detail||'خطأ';err.style.display='block';}
-  }catch{err.textContent='خطأ في الاتصال';err.style.display='block';}
-}
-
-// ── MODALS ────────────────────────────────────────────────────────────────────
-function showModal(id){
-  document.getElementById(id).classList.add('on');
-  if(id==='closeHourModal')showCloseHourModal();
-}
-function hideModal(id){document.getElementById(id).classList.remove('on');}
-
-// ── ICONS ─────────────────────────────────────────────────────────────────────
-const ICO={
-  up:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>',
-  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>',
-  net: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
-  cart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>',
-  ret: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>',
-  coin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>',
-};
+/* ── ENTER KEY ON LOGIN ── */
+document.getElementById('loginPass').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('loginUser').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('loginPass').focus();
+});
 </script>
 </body>
 </html>
