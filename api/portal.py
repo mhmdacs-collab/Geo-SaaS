@@ -2,7 +2,7 @@
 Aronium SaaS - Portal API
 ==========================
 Merchant dashboard endpoints (read-only + settings).
-Requires passlib + bcrypt (added in requirements.txt).
+Uses SHA-256 for password hashing (works with any Unicode characters).
 
 Data model reminder: ONE tenant row = one merchant (unique tax_number).
 A merchant can have MANY devices (branches), each with its own
@@ -21,7 +21,7 @@ from typing import Dict, List, Optional, Tuple
 import asyncpg
 import jwt
 from fastapi import APIRouter, Request, HTTPException
-from passlib.hash import bcrypt
+import hashlib
 
 log = logging.getLogger("ingest")
 
@@ -29,6 +29,21 @@ SALES = "2"
 REFUND = "4"
 PURCHASE = "1"
 STOCK_RETURN = "5"
+
+def hash_password(password: str) -> str:
+    """Hash password using SHA256 with salt."""
+    salt = "aronium_salt_2024"
+    return hashlib.sha256(f"{salt}{password}".encode('utf-8')).hexdigest()
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify password against hash."""
+    if not hashed:
+        return False
+    # New SHA256 hashes
+    if len(hashed) == 64 and all(c in '0123456789abcdef' for c in hashed):
+        return hash_password(password) == hashed
+    # Plain text comparison (for phone_number or old plain passwords)
+    return password.strip() == hashed.strip()
 
 _LOGIN_HITS: Dict[str, deque] = defaultdict(deque)
 _LOGIN_WINDOW = 60.0
@@ -111,19 +126,6 @@ def _period_bounds(close_hour, offset=0):
     return current_close + timedelta(days=offset), current_close + timedelta(days=offset + 1)
 
 
-def _verify_password(stored, pwd):
-    """Verify password against stored value."""
-    stored = (stored or "").strip()
-    if not stored:
-        return False
-    if stored.startswith("$"):
-        try:
-            return bcrypt.verify(pwd, stored)
-        except Exception:
-            return False
-    return stored == pwd
-
-
 async def _get_auth(request):
     state = request.app.state
     return await _require_portal(
@@ -160,7 +162,7 @@ async def portal_login(body: dict, request: Request):
         # Use password column directly (copied from phone_number initially)
         has_custom = bool(tenant["password"] and tenant["password"] != tenant["phone_number"])
         active_password = tenant["password"] or tenant["phone_number"]
-        ok = _verify_password(active_password, pwd)
+        ok = verify_password(pwd, active_password)
         if not ok:
             raise HTTPException(401, "Incorrect password")
 
@@ -215,7 +217,7 @@ async def portal_change_password(body: dict, request: Request):
     new_pwd = (body.get("new_password") or "").strip()
     if len(new_pwd) < 6:
         raise HTTPException(400, "Password must be at least 6 characters")
-    hashed = bcrypt.hash(new_pwd[:72])
+    hashed = hash_password(new_pwd)
     pool = state.pool
     async with pool.acquire() as conn:
         await conn.execute("UPDATE tenants SET password = $1 WHERE id = $2", hashed, auth.get("tenant_id"))
