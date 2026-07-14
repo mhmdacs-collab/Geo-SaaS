@@ -628,8 +628,13 @@ function loadSyncStatus() {
   fetch(API + '/sync-status' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
   .then(function(r) { return r.json(); })
   .then(function(d) {
-    var info = 'آخر مستند: ' + (d.last_doc_date || '—') + ' | الفواتير: ' + (d.total_invoices || 0);
-    if (d.devices) info += ' | الأجهزة: ' + d.devices;
+    var dateStr = '—';
+    if (d.last_doc_date) {
+      var dt = new Date(d.last_doc_date);
+      dateStr = dt.toLocaleDateString('ar-SA') + ' ' + dt.toLocaleTimeString('ar-SA', {hour: '2-digit', minute: '2-digit'});
+    }
+    var deviceCount = d.devices ? d.devices.length : 0;
+    var info = 'آخر مزامنة: ' + dateStr + ' | الفواتير: ' + (d.total_invoices || 0) + ' | الأجهزة النشطة: ' + deviceCount;
     document.getElementById('syncInfo').textContent = info;
   })
   .catch(function() {});
