@@ -200,14 +200,15 @@ button,input,select{font-family:inherit}
   .hdr-btn span{display:none}
   .app-body{flex-direction:column}
   .sidebar{width:100%;position:relative;top:0;height:auto;border-left:none;border-bottom:1px solid var(--border);padding:8px 12px;display:flex;flex-direction:row;flex-wrap:nowrap;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .sidebar > div{display:flex;flex-shrink:0;align-items:center}
   .sb-title{display:none}
-  .sb-item{margin-bottom:0;padding:6px 12px;font-size:10px;border-radius:99px;flex-shrink:0;gap:5px;border:1px solid var(--border);background:#fafafa}
-  .sb-item.active{border-color:rgba(0,188,212,.3)}
-  .sb-item svg{width:12px;height:12px}
+  .sb-item{margin-bottom:0;padding:6px 14px;font-size:10px;border-radius:99px;flex-shrink:0;gap:5px;border:1px solid var(--border);background:#fafafa;white-space:nowrap;display:flex;align-items:center}
+  .sb-item.active{border-color:rgba(0,188,212,.3);background:var(--brand-xl);color:var(--brand-d)}
+  .sb-item svg{width:12px;height:12px;flex-shrink:0}
   .sb-item .sb-sales{display:none}
   .sb-all{border:none;background:transparent;padding:0;margin:0}
   .sb-all .sb-item{border:1px dashed var(--border);border-radius:99px}
-  .sb-all.active .sb-item{border-style:solid;border-color:transparent}
+  .sb-all.active .sb-item{border-style:solid;background:var(--grad-brand);color:#fff}
   .main{padding:12px}
   .tabs{width:100%;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
   .tab{flex-shrink:0}
