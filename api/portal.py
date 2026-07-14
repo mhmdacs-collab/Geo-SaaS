@@ -215,7 +215,7 @@ async def portal_change_password(body: dict, request: Request):
     new_pwd = (body.get("new_password") or "").strip()
     if len(new_pwd) < 6:
         raise HTTPException(400, "Password must be at least 6 characters")
-    hashed = bcrypt.hash(new_pwd)
+    hashed = bcrypt.hash(new_pwd[:72])
     pool = state.pool
     async with pool.acquire() as conn:
         await conn.execute("UPDATE tenants SET password = $1 WHERE id = $2", hashed, auth.get("tenant_id"))
