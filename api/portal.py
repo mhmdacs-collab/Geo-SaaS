@@ -639,3 +639,82 @@ async def portal_client(request: Request):
         "sub_status": row["sub_status"],
         "sub_expires": row["expires_at"].isoformat() if row["expires_at"] else None,
     }
+
+
+# === NOTIFICATIONS ===
+@router.get("/notifications")
+async def get_notifications(request: Request, limit: int = 50, unread_only: bool = False):
+    """Get notifications for current tenant."""
+    state = request.app.state
+    auth = await _get_auth(request)
+    tid = auth.get("tenant_id")
+    pool = state.pool
+    
+    query = """
+        SELECT id, device_id, type, message, is_read, created_at
+        FROM notifications
+        WHERE tenant_id = $1::uuid
+    """
+    params = [tid]
+    
+    if unread_only:
+        query += " AND is_read = false"
+    
+    query += " ORDER BY created_at DESC LIMIT $2"
+    params.append(limit)
+    
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(query, *params)
+    
+    return {
+        "notifications": [
+            {
+                "id": str(r["id"]),
+                "device_id": str(r["device_id"]) if r["device_id"] else None,
+                "type": r["type"],
+                "message": r["message"],
+                "is_read": r["is_read"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.patch("/notifications/{notification_id}/read")
+async def mark_notification_read(request: Request, notification_id: str):
+    """Mark a notification as read."""
+    state = request.app.state
+    auth = await _get_auth(request)
+    tid = auth.get("tenant_id")
+    pool = state.pool
+    
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            """UPDATE notifications 
+               SET is_read = true 
+               WHERE id = $1::uuid AND tenant_id = $2::uuid""",
+            notification_id, tid
+        )
+    
+    if result == "UPDATE 0":
+        raise HTTPException(404, "Notification not found")
+    
+    return {"success": True}
+
+
+@router.post("/notifications/mark-all-read")
+async def mark_all_notifications_read(request: Request):
+    """Mark all notifications as read for current tenant."""
+    state = request.app.state
+    auth = await _get_auth(request)
+    tid = auth.get("tenant_id")
+    pool = state.pool
+    
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE notifications SET is_read = true WHERE tenant_id = $1::uuid AND is_read = false",
+            tid
+        )
+    
+    return {"success": True}

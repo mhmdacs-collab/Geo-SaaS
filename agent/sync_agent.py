@@ -446,6 +446,23 @@ class ApiClient:
         r.raise_for_status()
         return r.json().get("deleted", [])
 
+    def send_notification(self, notification_type: str, message: str) -> None:
+        """Send notification to dashboard."""
+        try:
+            url = f"{self.cfg.api_base_url}/api/v1/agents/notifications"
+            payload = {
+                "type": notification_type,
+                "message": message,
+            }
+            r = self.session.post(
+                url, json=payload, headers=self._headers(),
+                timeout=15, verify=self.cfg.verify_tls,
+            )
+            r.raise_for_status()
+            logger.debug(f"Notification sent: {notification_type}")
+        except Exception as e:
+            logger.warning(f"Failed to send notification: {e}")
+
 
 # ─── Subscription Error ──────────────────────────────────────────────────────
 class SubscriptionError(Exception):

@@ -702,10 +702,45 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
                 deleted = [r["pk"] for r in row]
         if deleted:
             log.info("reconcile %s: dropped %d stale rows", req.table, len(deleted))
+        
+        # Send notifications for deleted documents
+        if req.table == "document" and deleted:
+            try:
+                async with pool.acquire() as conn:
+                    # Insert notifications for deleted documents
+                    for pk in deleted[:10]:  # Limit to 10 to avoid spam
+                        await conn.execute(
+                            """INSERT INTO notifications (tenant_id, device_id, type, message)
+                               VALUES ($1::uuid, $2::uuid, 'invoice_deleted', $3)""",
+                            ctx.tenant_id, ctx.device_id, f"تم حذف الفاتورة رقم {pk}"
+                        )
+            except Exception as e:
+                log.warning(f"Failed to send delete notification: {e}")
+        
         return {"deleted": deleted, "table": req.table}
     except Exception as e:
         log.error(f"Reconcile error: {e}")
         raise HTTPException(500, f"Reconcile failed: {str(e)[:200]}")
+
+
+@app.post("/api/v1/agents/notifications")
+async def agent_send_notification(req: dict, ctx: AgentCtx = Depends(require_agent)):
+    """Agent sends notification to dashboard."""
+    pool: asyncpg.Pool = app.state.pool
+    notification_type = req.get("type", "info")
+    message = req.get("message", "")
+    
+    if not message:
+        raise HTTPException(400, "Message required")
+    
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """INSERT INTO notifications (tenant_id, device_id, type, message)
+               VALUES ($1::uuid, $2::uuid, $3, $4)""",
+            ctx.tenant_id, ctx.device_id, notification_type, message
+        )
+    
+    return {"success": True}
 
 
 # ────────────────────────────────────────────────────────────────────────────
