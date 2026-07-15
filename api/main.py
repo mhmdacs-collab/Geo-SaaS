@@ -744,6 +744,18 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
                                WHERE tenant_id=$1 AND device_id=$2""",
                             ctx.tenant_id, ctx.device_id
                         )
+                    
+                    # Filter out documents that already have notifications sent
+                    if docs_deleted:
+                        notified_ids = await conn.fetch(
+                            """SELECT document_id FROM deleted_documents_notified
+                               WHERE document_id = ANY($1::text[])
+                               AND tenant_id=$2::uuid""",
+                            [str(d["id"]) for d in docs_deleted],
+                            ctx.tenant_id
+                        )
+                        notified_set = {row["document_id"] for row in notified_ids}
+                        docs_deleted = [d for d in docs_deleted if str(d["id"]) not in notified_set]
                 else:
                     if not req.local_pks:
                         row = await conn.fetch(
@@ -764,36 +776,30 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
         if deleted:
             log.info("reconcile %s: dropped %d stale rows", req.table, len(deleted))
         
-        # Send notifications ONLY for actually deleted documents
-        if req.table.lower() == "document" and deleted:
-            try:
-                async with pool.acquire() as conn:
-                    # docs_deleted contains documents that were actually deleted
-                    # Create detailed notifications
-                    type_names = {
-                        "1": "فاتورة مشتريات",
-                        "2": "فاتورة مبيعات", 
-                        "3": "مرتجع مشتريات",
-                        "4": "مرتجع مبيعات",
-                        "5": "جرد",
-                        "6": "تحويل مخزون",
-                        "7": "تحويل مخزون"
-                    }
-                    
-                    for doc in docs_deleted[:10]:
-                        doc_type = str(doc["document_type_id"])
-                        type_name = type_names.get(doc_type, "فاتورة")
-                        total = float(doc["total"] or 0)
-                        total_str = f"{total:,.2f} ريال"
-                        message = f"تم حذف {type_name} ({total_str})"
+        # Send notifications ONLY for deleted purchase invoices (document_type_id = 1)
+        if req.table.lower() == "document" and docs_deleted:
+            # Filter: only purchase invoices (document_type_id = "1")
+            purchase_invoices = [doc for doc in docs_deleted if str(doc["document_type_id"]) == "1"]
+            
+            if purchase_invoices:
+                try:
+                    async with pool.acquire() as conn:
+                        type_names = {
+                            "1": "فاتورة مشتريات",
+                        }
                         
-                        await conn.execute(
-                            """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
-                               VALUES ($1::uuid, $2::uuid, 'invoice_deleted', $3)""",
-                            ctx.tenant_id, ctx.device_id, message
-                        )
-            except Exception as e:
-                log.warning(f"Failed to send delete notification: {e}")
+                        for doc in purchase_invoices[:10]:
+                            total = float(doc["total"] or 0)
+                            total_str = f"{total:,.2f} ريال"
+                            message = f"تم حذف فاتورة مشتريات ({total_str})"
+                            
+                            await conn.execute(
+                                """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
+                                   VALUES ($1::uuid, $2::uuid, 'invoice_deleted', $3)""",
+                                ctx.tenant_id, ctx.device_id, message
+                            )
+                except Exception as e:
+                    log.warning(f"Failed to send delete notification: {e}")
         
         return {"deleted": deleted, "table": req.table}
     except Exception as e:
