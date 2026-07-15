@@ -665,6 +665,21 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
                     values = list(_coerce_row(pg_cols, project_row(tdef, raw), pg_table))
                     rows_to_write.append((ctx.tenant_id, ctx.device_id, *values))
                 await conn.executemany(sql, rows_to_write)
+        
+        # Send notification for ZReport (daily close)
+        if req.table == "z_report" and rows_to_write:
+            try:
+                async with pool.acquire() as conn:
+                    for row in rows_to_write:
+                        z_number = row[4]  # Number is at index 4 after tenant_id, device_id, Id
+                        await conn.execute(
+                            """INSERT INTO notifications (tenant_id, device_id, type, message)
+                               VALUES ($1::uuid, $2::uuid, 'daily_close', $3)""",
+                            ctx.tenant_id, ctx.device_id, f"تم إغلاق اليوم - تقرير Z رقم {z_number}"
+                        )
+            except Exception as e:
+                log.warning(f"Failed to send ZReport notification: {e}")
+        
         return {"upserted": len(rows_to_write), "table": req.table}
     except Exception as e:
         log.error(f"Upsert error for {req.table}: {e}")
