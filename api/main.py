@@ -717,44 +717,58 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
 
     try:
         async with pool.acquire() as conn:
-            # Get document details before deletion (for notifications)
-            docs_to_delete = []
-            if req.table.lower() == "document" and req.local_pks:
-                docs_to_delete = await conn.fetch(
-                    """SELECT id, document_type_id, total 
-                       FROM document 
-                       WHERE tenant_id=$1 AND device_id=$2 AND id = ANY($3::text[])""",
-                    ctx.tenant_id, ctx.device_id, req.local_pks
-                )
-            
             async with conn.transaction():
                 # Scope deletion to THIS device only. Reconcile must never
                 # touch rows synced by another device under the same tenant
                 # (e.g. a branch's reconcile must not wipe the main store's
                 # documents/products just because they aren't in the
                 # branch's own local id list).
-                if not req.local_pks:
-                    row = await conn.fetch(
-                        f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
-                        f"RETURNING {pk_text_expr} AS pk",
-                        ctx.tenant_id, ctx.device_id,
-                    )
+                
+                # For documents: get details BEFORE deletion (for notifications)
+                docs_deleted = []
+                if req.table.lower() == "document":
+                    if req.local_pks:
+                        # Get docs that will be deleted (those NOT in local_pks)
+                        docs_deleted = await conn.fetch(
+                            """SELECT id, document_type_id, total 
+                               FROM document 
+                               WHERE tenant_id=$1 AND device_id=$2
+                               AND id <> ALL($3::text[])""",
+                            ctx.tenant_id, ctx.device_id, req.local_pks
+                        )
+                    else:
+                        # Delete all - get all details
+                        docs_deleted = await conn.fetch(
+                            """SELECT id, document_type_id, total 
+                               FROM document 
+                               WHERE tenant_id=$1 AND device_id=$2""",
+                            ctx.tenant_id, ctx.device_id
+                        )
                 else:
-                    row = await conn.fetch(
-                        f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
-                        f"AND {pk_text_expr} <> ALL($3::text[]) "
-                        f"RETURNING {pk_text_expr} AS pk",
-                        ctx.tenant_id, ctx.device_id, req.local_pks,
-                    )
+                    if not req.local_pks:
+                        row = await conn.fetch(
+                            f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
+                            f"RETURNING {pk_text_expr} AS pk",
+                            ctx.tenant_id, ctx.device_id,
+                        )
+                    else:
+                        row = await conn.fetch(
+                            f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
+                            f"AND {pk_text_expr} <> ALL($3::text[]) "
+                            f"RETURNING {pk_text_expr} AS pk",
+                            ctx.tenant_id, ctx.device_id, req.local_pks,
+                        )
+                
                 deleted = [r["pk"] for r in row]
         
         if deleted:
             log.info("reconcile %s: dropped %d stale rows", req.table, len(deleted))
         
-        # Send notifications for deleted documents
-        if req.table.lower() == "document" and docs_to_delete:
+        # Send notifications ONLY for actually deleted documents
+        if req.table.lower() == "document" and deleted:
             try:
                 async with pool.acquire() as conn:
+                    # docs_deleted contains documents that were actually deleted
                     # Create detailed notifications
                     type_names = {
                         "1": "فاتورة مشتريات",
@@ -766,7 +780,7 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
                         "7": "تحويل مخزون"
                     }
                     
-                    for doc in docs_to_delete[:10]:
+                    for doc in docs_deleted[:10]:
                         doc_type = str(doc["document_type_id"])
                         type_name = type_names.get(doc_type, "فاتورة")
                         total = float(doc["total"] or 0)
