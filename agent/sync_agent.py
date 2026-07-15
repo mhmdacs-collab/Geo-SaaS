@@ -31,6 +31,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -463,6 +464,24 @@ class ApiClient:
         except Exception as e:
             logger.warning(f"Failed to send notification: {e}")
 
+    def report_day_status(self, closed_today: bool, current_hour: int) -> Dict[str, Any]:
+        """Report day status to server for auto-close logic."""
+        try:
+            url = f"{self.cfg.api_base_url}/api/v1/agents/day-status"
+            payload = {
+                "closed_today": closed_today,
+                "current_hour": current_hour,
+            }
+            r = self.session.post(
+                url, json=payload, headers=self._headers(),
+                timeout=15, verify=self.cfg.verify_tls,
+            )
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:
+            logger.warning(f"Failed to report day status: {e}")
+            return {"auto_close": False}
+
 
 # ─── Subscription Error ──────────────────────────────────────────────────────
 class SubscriptionError(Exception):
@@ -793,6 +812,10 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
     conn = sqlite3.connect(snap_path)
     conn.row_factory = sqlite3.Row
     all_synced = 0
+    
+    # Track if ZReport was synced this cycle (for day status)
+    z_report_synced = False
+    
     try:
         parent_cursor_before_doc = _cursor_get("Document") or "1970-01-01 00:00:00"
 
@@ -805,6 +828,8 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
                 elif strategy == "z_report_with_summary":
                     n = _sync_z_report_with_summary(conn, api, table, cfg.batch_size)
                     all_synced += n
+                    if n > 0:
+                        z_report_synced = True
                 elif strategy == "hash_diff":
                     changed, total = _sync_hash_diff(conn, api, table)
                     all_synced += changed
@@ -869,6 +894,15 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
         snap.close()
     except Exception as e:
         logger.error(f"Reconcile cycle failed: {e}")
+    
+    # Check day status for auto-close logic
+    try:
+        current_hour = datetime.now().hour
+        result = api.report_day_status(z_report_synced, current_hour)
+        if result.get("auto_close"):
+            logger.info("Day auto-closed by server (no ZReport synced)")
+    except Exception as e:
+        logger.warning(f"Day status check failed: {e}")
     
     logger.info(LOG["sync_done"].format(total=all_synced))
 

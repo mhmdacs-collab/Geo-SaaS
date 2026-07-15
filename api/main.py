@@ -680,6 +680,28 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
             except Exception as e:
                 log.warning(f"Failed to send ZReport notification: {e}")
         
+        # Send notification for StartingCash (store open)
+        # StartingCashType: 0 = beginning of day (store open), 1 = end of day (store close)
+        if req.table.lower() == "starting_cash" and rows_to_write:
+            try:
+                async with pool.acquire() as conn:
+                    for row in rows_to_write:
+                        # cols: tenant_id, device_id, Id, UserId, Amount, Description, StartingCashType, ZReportNumber, DateCreated
+                        starting_cash_type = row[6]  # StartingCashType
+                        amount = row[4]  # Amount
+                        
+                        # Only notify for beginning of day (type = 0)
+                        if str(starting_cash_type) == "0":
+                            amount_str = f"{float(amount or 0):,.2f} ريال"
+                            message = f"تم فتح المتجر - بداية النقدية: {amount_str}"
+                            await conn.execute(
+                                """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
+                                   VALUES ($1::uuid, $2::uuid, 'store_open', $3)""",
+                                ctx.tenant_id, ctx.device_id, message
+                            )
+            except Exception as e:
+                log.warning(f"Failed to send StartingCash notification: {e}")
+        
         return {"upserted": len(rows_to_write), "table": req.table}
     except Exception as e:
         log.error(f"Upsert error for {req.table}: {e}")
@@ -695,6 +717,16 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
 
     try:
         async with pool.acquire() as conn:
+            # Get document details before deletion (for notifications)
+            docs_to_delete = []
+            if req.table.lower() == "document" and req.local_pks:
+                docs_to_delete = await conn.fetch(
+                    """SELECT id, document_type_id, total 
+                       FROM document 
+                       WHERE tenant_id=$1 AND device_id=$2 AND id = ANY($3::text[])""",
+                    ctx.tenant_id, ctx.device_id, req.local_pks
+                )
+            
             async with conn.transaction():
                 # Scope deletion to THIS device only. Reconcile must never
                 # touch rows synced by another device under the same tenant
@@ -715,19 +747,36 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
                         ctx.tenant_id, ctx.device_id, req.local_pks,
                     )
                 deleted = [r["pk"] for r in row]
+        
         if deleted:
             log.info("reconcile %s: dropped %d stale rows", req.table, len(deleted))
         
         # Send notifications for deleted documents
-        if req.table.lower() == "document" and deleted:
+        if req.table.lower() == "document" and docs_to_delete:
             try:
                 async with pool.acquire() as conn:
-                    # Insert notifications for deleted documents
-                    for pk in deleted[:10]:  # Limit to 10 to avoid spam
+                    # Create detailed notifications
+                    type_names = {
+                        "1": "فاتورة مشتريات",
+                        "2": "فاتورة مبيعات", 
+                        "3": "مرتجع مشتريات",
+                        "4": "مرتجع مبيعات",
+                        "5": "جرد",
+                        "6": "تحويل مخزون",
+                        "7": "تحويل مخزون"
+                    }
+                    
+                    for doc in docs_to_delete[:10]:
+                        doc_type = str(doc["document_type_id"])
+                        type_name = type_names.get(doc_type, "فاتورة")
+                        total = float(doc["total"] or 0)
+                        total_str = f"{total:,.2f} ريال"
+                        message = f"تم حذف {type_name} ({total_str})"
+                        
                         await conn.execute(
                             """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
                                VALUES ($1::uuid, $2::uuid, 'invoice_deleted', $3)""",
-                            ctx.tenant_id, ctx.device_id, f"تم حذف الفاتورة رقم {pk}"
+                            ctx.tenant_id, ctx.device_id, message
                         )
             except Exception as e:
                 log.warning(f"Failed to send delete notification: {e}")
@@ -756,6 +805,55 @@ async def agent_send_notification(req: dict, ctx: AgentCtx = Depends(require_age
         )
     
     return {"success": True}
+
+
+@app.post("/api/v1/agents/day-status")
+async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
+    """Agent reports day status for auto-close logic.
+    
+    Agent sends: closed_today (bool), current_hour (int)
+    Server checks: if not closed and current_hour >= close_hour → auto-close notification
+    The close_hour is set by the tenant themselves (recommended 1-2 hours after actual close).
+    """
+    pool: asyncpg.Pool = app.state.pool
+    closed_today = req.get("closed_today", False)
+    current_hour = int(req.get("current_hour", 0))
+    
+    async with pool.acquire() as conn:
+        # Get tenant's close_hour
+        tenant = await conn.fetchrow(
+            "SELECT close_hour FROM tenants WHERE id=$1::uuid",
+            ctx.tenant_id
+        )
+        if not tenant:
+            return {"auto_close": False}
+        
+        close_hour = int(tenant["close_hour"] or 0)
+        
+        # Check if should trigger auto-close notification
+        should_notify = False
+        if not closed_today and current_hour >= close_hour:
+            should_notify = True
+        
+        if should_notify:
+            # Check if we already sent auto-close notification today (avoid spam)
+            existing = await conn.fetchval("""
+                SELECT COUNT(*) FROM notifications
+                WHERE tenant_id=$1::uuid AND device_id=$2::uuid
+                AND notification_type='auto_close'
+                AND created_at >= CURRENT_DATE
+            """, ctx.tenant_id, ctx.device_id)
+            
+            if existing == 0:
+                await conn.execute(
+                    """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
+                       VALUES ($1::uuid, $2::uuid, 'auto_close', $3)""",
+                    ctx.tenant_id, ctx.device_id,
+                    "لم يتم إغلاق اليوم - تم الإغلاق الأوتوماتيكي"
+                )
+                return {"auto_close": True}
+        
+        return {"auto_close": False}
 
 
 # ────────────────────────────────────────────────────────────────────────────

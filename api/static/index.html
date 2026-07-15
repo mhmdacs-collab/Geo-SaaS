@@ -184,6 +184,8 @@ button,input,select{font-family:inherit}
 .notif-type-invoice_deleted{border-right-color:var(--red)!important}
 .notif-type-invoice_modified{border-right-color:var(--amber)!important}
 .notif-type-tax_ready{border-right-color:var(--green)!important}
+.notif-type-store_open{border-right-color:var(--brand)!important}
+.notif-type-auto_close{border-right-color:var(--amber)!important}
 
 /* ── MODAL ── */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s;padding:20px}
@@ -369,8 +371,12 @@ button,input,select{font-family:inherit}
     </div>
 
     <div class="fg">
-      <label>وقت إغلاق النشاط (ساعة 0-23)</label>
+      <label>الإغلاق الأوتوماتيكي (ساعة 0-23)</label>
       <input type="number" id="setHour" min="0" max="23" value="0">
+      <p style="font-size:10px;color:var(--muted);margin-top:4px">
+        في حال لم يتم إغلاق اليوم من البرنامج، سيتم إغلاقه تلقائياً عند هذه الساعة.
+        <br>ننصح بتحديده بعد ساعة إلى ساعتين من موعد إغلاق المتجر الفعلي.
+      </p>
     </div>
     <button type="button" class="btn" onclick="saveCloseHour()" style="margin-bottom:16px">حفظ وقت الإغلاق</button>
 
@@ -403,10 +409,16 @@ button,input,select{font-family:inherit}
 <div class="modal" id="onboardModal">
   <div class="mbox" style="text-align:center">
     <h3 style="justify-content:center;margin-bottom:8px">مرحباً بك!</h3>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">حدد وقت إغلاق نشاطك التجاري</p>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">
+      حدد وقت الإغلاق الأوتوماتيكي
+      <br><span style="font-size:10px">
+      في حال لم يغلق الكاشير اليوم من البرنامج، سيتم إغلاقه تلقائياً عند هذه الساعة.
+      <br>اخترها بعد ساعة أو ساعتين من موعد إغلاق المتجر الفعلي.
+      </span>
+    </p>
     <div class="fg">
-      <label>ساعة الإغلاق (0-23)</label>
-      <input type="number" id="onboardHour" min="0" max="23" value="0">
+      <label>ساعة الإغلاق الأوتوماتيكي (0-23)</label>
+      <input type="number" id="onboardHour" min="0" max="23" value="2">
     </div>
     <button type="button" class="btn" onclick="saveOnboard()">بدء الاستخدام</button>
   </div>

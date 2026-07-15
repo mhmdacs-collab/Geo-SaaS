@@ -564,6 +564,10 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
         })
 
     for r in treasury_rows:
+        # Skip StartingCash with amount=0 (opening cash - not a transaction)
+        if float(r["amount"] or 0) == 0:
+            continue
+        
         operations.append({
             "id": str(r["id"]),
             "type": "expense" if r["starting_cash_type"] == 1 else "income",
