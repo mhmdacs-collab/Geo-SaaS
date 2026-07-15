@@ -651,7 +651,7 @@ async def get_notifications(request: Request, limit: int = 50, unread_only: bool
     pool = state.pool
     
     query = """
-        SELECT id, device_id, type, message, is_read, created_at
+        SELECT id, device_id, notification_type, message, is_read, created_at
         FROM notifications
         WHERE tenant_id = $1::uuid
     """
@@ -671,7 +671,7 @@ async def get_notifications(request: Request, limit: int = 50, unread_only: bool
             {
                 "id": str(r["id"]),
                 "device_id": str(r["device_id"]) if r["device_id"] else None,
-                "type": r["type"],
+                "type": r["notification_type"],
                 "message": r["message"],
                 "is_read": r["is_read"],
                 "created_at": r["created_at"].isoformat() if r["created_at"] else None,

@@ -673,7 +673,7 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
                     for row in rows_to_write:
                         z_number = row[4]  # Number is at index 4 after tenant_id, device_id, Id
                         await conn.execute(
-                            """INSERT INTO notifications (tenant_id, device_id, type, message)
+                            """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
                                VALUES ($1::uuid, $2::uuid, 'daily_close', $3)""",
                             ctx.tenant_id, ctx.device_id, f"تم إغلاق اليوم - تقرير Z رقم {z_number}"
                         )
@@ -725,7 +725,7 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
                     # Insert notifications for deleted documents
                     for pk in deleted[:10]:  # Limit to 10 to avoid spam
                         await conn.execute(
-                            """INSERT INTO notifications (tenant_id, device_id, type, message)
+                            """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
                                VALUES ($1::uuid, $2::uuid, 'invoice_deleted', $3)""",
                             ctx.tenant_id, ctx.device_id, f"تم حذف الفاتورة رقم {pk}"
                         )
@@ -750,7 +750,7 @@ async def agent_send_notification(req: dict, ctx: AgentCtx = Depends(require_age
     
     async with pool.acquire() as conn:
         await conn.execute(
-            """INSERT INTO notifications (tenant_id, device_id, type, message)
+            """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
                VALUES ($1::uuid, $2::uuid, $3, $4)""",
             ctx.tenant_id, ctx.device_id, notification_type, message
         )
