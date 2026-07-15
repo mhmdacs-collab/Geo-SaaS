@@ -1,0 +1,5 @@
+{
+  "api_base_url": "https://aronium-sync.onrender.com",
+  "sync_interval_sec": 60,
+  "aronium_db_path": "C:\\Users\\Mohammed\\AppData\\Local\\Aronium\\Data\\pos.db"
+}

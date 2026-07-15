@@ -826,6 +826,33 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
                 logger.error(LOG["err_cycle"].format(reason=str(e)))
     finally:
         conn.close()
+    
+    # Reconcile: detect local deletions and sync them to server
+    # IMPORTANT: Reconcile child tables FIRST (DocumentItem, Payment) before parents (Document)
+    # to avoid foreign key constraint violations
+    try:
+        snap = sqlite3.connect(snap_path)
+        snap.row_factory = sqlite3.Row
+        
+        # Reverse order for reconcile: children before parents
+        reconcile_order = list(reversed(SYNC_MAP))
+        
+        for table in reconcile_order:
+            strategy = table["strategy"]
+            if strategy in ("incremental_updated", "hash_diff", "z_report_with_summary", "child_of"):
+                name = table["name"]
+                logger.info(f"Reconciling {name}...")
+                try:
+                    deleted_count = _reconcile_table(snap, api, table)
+                    if deleted_count > 0:
+                        logger.info(LOG["table_reconcile"].format(count=deleted_count, table=name))
+                except Exception as e:
+                    logger.error(f"Reconcile {name} failed: {e}")
+        
+        snap.close()
+    except Exception as e:
+        logger.error(f"Reconcile cycle failed: {e}")
+    
     logger.info(LOG["sync_done"].format(total=all_synced))
 
 
