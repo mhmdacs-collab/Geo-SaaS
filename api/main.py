@@ -667,7 +667,7 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
                 await conn.executemany(sql, rows_to_write)
         
         # Send notification for ZReport (daily close)
-        if req.table == "z_report" and rows_to_write:
+        if req.table.lower() == "z_report" and rows_to_write:
             try:
                 async with pool.acquire() as conn:
                     for row in rows_to_write:
@@ -719,7 +719,7 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
             log.info("reconcile %s: dropped %d stale rows", req.table, len(deleted))
         
         # Send notifications for deleted documents
-        if req.table == "document" and deleted:
+        if req.table.lower() == "document" and deleted:
             try:
                 async with pool.acquire() as conn:
                     # Insert notifications for deleted documents
