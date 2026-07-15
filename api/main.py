@@ -723,83 +723,23 @@ async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
                 # (e.g. a branch's reconcile must not wipe the main store's
                 # documents/products just because they aren't in the
                 # branch's own local id list).
-                
-                # For documents: get details BEFORE deletion (for notifications)
-                docs_deleted = []
-                if req.table.lower() == "document":
-                    if req.local_pks:
-                        # Get docs that will be deleted (those NOT in local_pks)
-                        docs_deleted = await conn.fetch(
-                            """SELECT id, document_type_id, total 
-                               FROM document 
-                               WHERE tenant_id=$1 AND device_id=$2
-                               AND id <> ALL($3::text[])""",
-                            ctx.tenant_id, ctx.device_id, req.local_pks
-                        )
-                    else:
-                        # Delete all - get all details
-                        docs_deleted = await conn.fetch(
-                            """SELECT id, document_type_id, total 
-                               FROM document 
-                               WHERE tenant_id=$1 AND device_id=$2""",
-                            ctx.tenant_id, ctx.device_id
-                        )
-                    
-                    # Filter out documents that already have notifications sent
-                    if docs_deleted:
-                        notified_ids = await conn.fetch(
-                            """SELECT document_id FROM deleted_documents_notified
-                               WHERE document_id = ANY($1::text[])
-                               AND tenant_id=$2::uuid""",
-                            [str(d["id"]) for d in docs_deleted],
-                            ctx.tenant_id
-                        )
-                        notified_set = {row["document_id"] for row in notified_ids}
-                        docs_deleted = [d for d in docs_deleted if str(d["id"]) not in notified_set]
+                if not req.local_pks:
+                    row = await conn.fetch(
+                        f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
+                        f"RETURNING {pk_text_expr} AS pk",
+                        ctx.tenant_id, ctx.device_id,
+                    )
                 else:
-                    if not req.local_pks:
-                        row = await conn.fetch(
-                            f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
-                            f"RETURNING {pk_text_expr} AS pk",
-                            ctx.tenant_id, ctx.device_id,
-                        )
-                    else:
-                        row = await conn.fetch(
-                            f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
-                            f"AND {pk_text_expr} <> ALL($3::text[]) "
-                            f"RETURNING {pk_text_expr} AS pk",
-                            ctx.tenant_id, ctx.device_id, req.local_pks,
-                        )
-                
+                    row = await conn.fetch(
+                        f"DELETE FROM {pg_table} WHERE tenant_id=$1 AND device_id=$2 "
+                        f"AND {pk_text_expr} <> ALL($3::text[]) "
+                        f"RETURNING {pk_text_expr} AS pk",
+                        ctx.tenant_id, ctx.device_id, req.local_pks,
+                    )
                 deleted = [r["pk"] for r in row]
         
         if deleted:
             log.info("reconcile %s: dropped %d stale rows", req.table, len(deleted))
-        
-        # Send notifications ONLY for deleted purchase invoices (document_type_id = 1)
-        if req.table.lower() == "document" and docs_deleted:
-            # Filter: only purchase invoices (document_type_id = "1")
-            purchase_invoices = [doc for doc in docs_deleted if str(doc["document_type_id"]) == "1"]
-            
-            if purchase_invoices:
-                try:
-                    async with pool.acquire() as conn:
-                        type_names = {
-                            "1": "فاتورة مشتريات",
-                        }
-                        
-                        for doc in purchase_invoices[:10]:
-                            total = float(doc["total"] or 0)
-                            total_str = f"{total:,.2f} ريال"
-                            message = f"تم حذف فاتورة مشتريات ({total_str})"
-                            
-                            await conn.execute(
-                                """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
-                                   VALUES ($1::uuid, $2::uuid, 'invoice_deleted', $3)""",
-                                ctx.tenant_id, ctx.device_id, message
-                            )
-                except Exception as e:
-                    log.warning(f"Failed to send delete notification: {e}")
         
         return {"deleted": deleted, "table": req.table}
     except Exception as e:
