@@ -936,6 +936,24 @@ def main() -> None:
             time.sleep(300)
         except Exception as e:
             logger.error(LOG["err_cycle"].format(reason=str(e)))
+            
+            # Retry mechanism: 3 attempts with increasing delay
+            retry_count = 0
+            while retry_count < 3:
+                retry_count += 1
+                retry_delay = 5 * (2 ** (retry_count - 1))  # 5s, 10s, 20s
+                logger.info(f"Retrying sync in {retry_delay}s (attempt {retry_count}/3)...")
+                time.sleep(retry_delay)
+                
+                try:
+                    snap = snapshot_db(db_path)
+                    if snap:
+                        ensure_activated(cfg, api, snap)
+                        run_sync_cycle(cfg, api, snap)
+                        logger.info("Retry successful")
+                        break
+                except Exception as retry_e:
+                    logger.error(f"Retry {retry_count} failed: {retry_e}")
         finally:
             try:
                 os.remove(snap)
