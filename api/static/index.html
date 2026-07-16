@@ -620,10 +620,10 @@ function renderSidebar() {
     var sales = b.today_sales || 0;
     totalSales += sales;
     var dotColor = b.is_active ? 'var(--green)' : 'var(--muted)';
-    html += '<div class="sb-item" data-branch="' + b.device_id + '" onclick="selectBranch(\'' + b.device_id + '\')">'
+    html += '<div class="sb-item" data-branch="' + escapeHtml(b.device_id) + '" onclick="selectBranch(this.getAttribute(\'data-branch\'))">'
       + '<span class="sb-status" style="background:' + dotColor + '"></span>'
       + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
-      + b.branch_name
+      + escapeHtml(b.branch_name)
       + '<span class="sb-sales">' + fmt(sales) + '</span>'
       + '</div>';
   }
@@ -1214,16 +1214,25 @@ function renderNotifications(notifications) {
   var html = '';
   notifications.forEach(function(notif) {
     var unreadClass = notif.is_read ? '' : ' unread';
-    var typeClass = ' notif-type-' + notif.type;
+    var typeClass = ' notif-type-' + (notif.type || 'info').replace(/[^a-z0-9_]/g, '');
     var time = formatNotifTime(notif.created_at);
     
-    html += '<div class="notif-item' + unreadClass + typeClass + '" onclick="markAsRead(\'' + notif.id + '\')" data-id="' + notif.id + '">';
+    html += '<div class="notif-item' + unreadClass + typeClass + '" data-id="' + escapeHtml(notif.id) + '">';
     html += '<div class="notif-msg">' + escapeHtml(notif.message) + '</div>';
     html += '<div class="notif-time">' + time + '</div>';
     html += '</div>';
   });
   
   list.innerHTML = html;
+  
+  // Add event listeners for marking as read (avoid inline onclick for XSS protection)
+  var items = list.querySelectorAll('.notif-item');
+  items.forEach(function(item) {
+    item.addEventListener('click', function() {
+      var id = this.getAttribute('data-id');
+      if (id) markAsRead(id);
+    });
+  });
 }
 
 function formatNotifTime(isoString) {
