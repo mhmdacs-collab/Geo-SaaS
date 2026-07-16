@@ -22,6 +22,7 @@ import asyncpg
 import jwt
 from fastapi import APIRouter, Request, HTTPException
 import hashlib
+import bcrypt
 
 log = logging.getLogger("ingest")
 
@@ -32,17 +33,22 @@ STOCK_RETURN = "5"
 EXPENSE = "6"
 
 def hash_password(password: str) -> str:
-    """Hash password using SHA256 with salt."""
-    salt = "aronium_salt_2024"
-    return hashlib.sha256(f"{salt}{password}".encode('utf-8')).hexdigest()
+    """Hash password using bcrypt with automatic salt generation."""
+    # Generate a new salt for each password hash
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash."""
+    """Verify password against hash (supports bcrypt and legacy SHA-256)."""
     if not hashed:
         return False
-    # New SHA256 hashes
+    # Check if it's a bcrypt hash (starts with $2b$)
+    if hashed.startswith('$2b$'):
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    # Legacy SHA-256 support for migration
     if len(hashed) == 64 and all(c in '0123456789abcdef' for c in hashed):
-        return hash_password(password) == hashed
+        salt = "aronium_salt_2024"
+        return hashlib.sha256(f"{salt}{password}".encode('utf-8')).hexdigest() == hashed
     # Plain text comparison (for phone_number or old plain passwords)
     return password.strip() == hashed.strip()
 

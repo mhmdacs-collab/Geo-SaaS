@@ -272,17 +272,22 @@ def find_aronium_db(cfg: AgentConfig) -> Optional[str]:
 
 def snapshot_db(src_path: str) -> Optional[str]:
     dst_path = os.path.join(tempfile.gettempdir(), "aronium_snap.db")
+    src = None
+    dst = None
     try:
         src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True)
         dst = sqlite3.connect(dst_path)
         with dst:
             src.backup(dst)
-        src.close()
-        dst.close()
         return dst_path
     except Exception as e:
         logger.error(f"DB snapshot failed: {e}")
         return None
+    finally:
+        if src:
+            src.close()
+        if dst:
+            dst.close()
 
 
 def read_device_info(snap_path: str) -> Dict[str, Any]:
@@ -872,6 +877,7 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
     # Reconcile: detect local deletions and sync them to server
     # IMPORTANT: Reconcile child tables FIRST (DocumentItem, Payment) before parents (Document)
     # to avoid foreign key constraint violations
+    snap = None
     try:
         snap = sqlite3.connect(snap_path)
         snap.row_factory = sqlite3.Row
@@ -890,16 +896,17 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
                         logger.info(LOG["table_reconcile"].format(count=deleted_count, table=name))
                 except Exception as e:
                     logger.error(f"Reconcile {name} failed: {e}")
-        
-        snap.close()
     except Exception as e:
         logger.error(f"Reconcile cycle failed: {e}")
+    finally:
+        if snap:
+            snap.close()
     
     # Check day status for auto-close logic
     # Check Aronium DB directly: was a ZReport created today?
     try:
         today_str = datetime.now().strftime("%Y-%m-%d")
-        db_conn = sqlite3.connect(db_path)
+        db_conn = sqlite3.connect(snap_path)
         last_z = db_conn.execute(
             '''SELECT DateCreated FROM ZReport 
                WHERE DateCreated >= ? 

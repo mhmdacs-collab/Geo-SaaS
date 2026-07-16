@@ -32,7 +32,7 @@ JWT_ALG = "HS256"
 JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "aronium-agent")
 ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "")
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
-JWT_TTL_DAYS = int(os.environ.get("JWT_TTL_DAYS", "365"))
+JWT_TTL_DAYS = int(os.environ.get("JWT_TTL_DAYS", "30"))  # Reduced from 365 to 30 days
 SUPPORT_WA = os.environ.get("SUPPORT_WA", "966558110150")
 
 if not DATABASE_URL:
@@ -82,7 +82,11 @@ class RateLimiter:
         return True
 
 
-activate_limiter = RateLimiter(max_requests=10, window_seconds=300)
+# Rate limiters for different endpoints
+activate_limiter = RateLimiter(max_requests=10, window_seconds=300)  # 10 requests per 5 min
+login_limiter = RateLimiter(max_requests=20, window_seconds=300)     # 20 requests per 5 min
+api_limiter = RateLimiter(max_requests=100, window_seconds=60)       # 100 requests per minute
+sync_limiter = RateLimiter(max_requests=60, window_seconds=60)       # 60 sync requests per minute
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -236,7 +240,7 @@ async def require_agent(
     try:
         payload = jwt.decode(
             token, JWT_SECRET, algorithms=[JWT_ALG],
-            options={"verify_aud": False},
+            audience=JWT_AUDIENCE,
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "token expired")
@@ -677,7 +681,10 @@ def _get_current_quarter_deadline_info(now: datetime) -> dict | None:
 
 
 @app.post("/api/v1/agents/heartbeat")
-async def heartbeat(req: HeartbeatReq, ctx: AgentCtx = Depends(require_agent)):
+async def heartbeat(req: HeartbeatReq, ctx: AgentCtx = Depends(require_agent), request: Request = None):
+    client_ip = request.client.host if request and request.client else "unknown"
+    if not sync_limiter.is_allowed(f"hb:{client_ip}"):
+        raise HTTPException(429, "Rate limited")
     pool: asyncpg.Pool = app.state.pool
     async with pool.acquire() as conn:
         # Check subscription status
@@ -732,7 +739,10 @@ async def heartbeat(req: HeartbeatReq, ctx: AgentCtx = Depends(require_agent)):
 
 
 @app.post("/api/v1/sync/upsert")
-async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
+async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request: Request = None):
+    client_ip = request.client.host if request and request.client else "unknown"
+    if not sync_limiter.is_allowed(f"up:{client_ip}"):
+        raise HTTPException(429, "Rate limited")
     if not req.rows:
         return {"upserted": 0}
 
@@ -794,7 +804,10 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
 
 
 @app.post("/api/v1/sync/reconcile")
-async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent)):
+async def reconcile(req: ReconcileReq, ctx: AgentCtx = Depends(require_agent), request: Request = None):
+    client_ip = request.client.host if request and request.client else "unknown"
+    if not sync_limiter.is_allowed(f"re:{client_ip}"):
+        raise HTTPException(429, "Rate limited")
     pool: asyncpg.Pool = app.state.pool
     tdef = validate_table(req.table)
     pg_table = tdef["pg_table"]
