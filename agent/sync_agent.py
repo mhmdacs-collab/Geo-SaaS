@@ -896,9 +896,20 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
         logger.error(f"Reconcile cycle failed: {e}")
     
     # Check day status for auto-close logic
+    # Check Aronium DB directly: was a ZReport created today?
     try:
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        db_conn = sqlite3.connect(db_path)
+        last_z = db_conn.execute(
+            '''SELECT DateCreated FROM ZReport 
+               WHERE DateCreated >= ? 
+               ORDER BY DateCreated DESC LIMIT 1''',
+            (today_str,)
+        ).fetchone()
+        db_conn.close()
+        closed_today = last_z is not None
         current_hour = datetime.now().hour
-        result = api.report_day_status(z_report_synced, current_hour)
+        result = api.report_day_status(closed_today, current_hour)
         if result.get("auto_close"):
             logger.info("Day auto-closed by server (no ZReport synced)")
     except Exception as e:

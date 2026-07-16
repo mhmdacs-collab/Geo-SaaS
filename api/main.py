@@ -667,7 +667,7 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
                 await conn.executemany(sql, rows_to_write)
         
         # Send notification for ZReport (daily close)
-        if req.table.lower() == "z_report" and rows_to_write:
+        if req.table.lower() == "zreport" and rows_to_write:
             try:
                 async with pool.acquire() as conn:
                     for row in rows_to_write:
@@ -679,28 +679,6 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent)):
                         )
             except Exception as e:
                 log.warning(f"Failed to send ZReport notification: {e}")
-        
-        # Send notification for StartingCash (store open)
-        # StartingCashType: 0 = beginning of day (store open), 1 = end of day (store close)
-        if req.table.lower() == "starting_cash" and rows_to_write:
-            try:
-                async with pool.acquire() as conn:
-                    for row in rows_to_write:
-                        # cols: tenant_id, device_id, Id, UserId, Amount, Description, StartingCashType, ZReportNumber, DateCreated
-                        starting_cash_type = row[6]  # StartingCashType
-                        amount = row[4]  # Amount
-                        
-                        # Only notify for beginning of day (type = 0)
-                        if str(starting_cash_type) == "0":
-                            amount_str = f"{float(amount or 0):,.2f} ريال"
-                            message = f"تم فتح المتجر - بداية النقدية: {amount_str}"
-                            await conn.execute(
-                                """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
-                                   VALUES ($1::uuid, $2::uuid, 'store_open', $3)""",
-                                ctx.tenant_id, ctx.device_id, message
-                            )
-            except Exception as e:
-                log.warning(f"Failed to send StartingCash notification: {e}")
         
         return {"upserted": len(rows_to_write), "table": req.table}
     except Exception as e:
