@@ -172,7 +172,8 @@ async def portal_login(body: dict, request: Request):
         onboarded = bool(tenant["onboarded"])
 
         devices = await conn.fetch("""
-            SELECT id AS device_id, branch_name, branch_type, is_active
+            SELECT id AS device_id, branch_name, branch_type, is_active,
+                   application_id
             FROM devices WHERE tenant_id = $1 ORDER BY registered_at
         """, tenant["tenant_id"])
 
@@ -199,9 +200,11 @@ async def portal_login(body: dict, request: Request):
         tenant_id, tax, tenant["store_name"] or "", close_hour, onboarded,
         jwt_secret=state.jwt_secret, jwt_alg=state.jwt_alg,
     )
+    app_id = devices[0]["application_id"] if devices and devices[0]["application_id"] else ""
     return {
         "token": token, "store_name": tenant["store_name"] or "",
         "tax_number": tax, "close_hour": close_hour, "onboarded": onboarded,
+        "application_id": app_id,
         "branches": branches,
         "support_wa": getattr(state, "support_wa", "966558110150"),
         "has_custom_password": has_custom,
