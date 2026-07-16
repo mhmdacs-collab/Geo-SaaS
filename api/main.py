@@ -600,6 +600,82 @@ async def activate(req: ActivateReq, request: Request):
     )
 
 
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# VAT declaration reminder logic
+# ────────────────────────────────────────────────────────────────────────────
+# Saudi ZATCA quarterly deadlines (for businesses < 40M SAR annual revenue):
+#   Q1 (Jan-Mar): deadline April 30   → notify April 25
+#   Q2 (Apr-Jun): deadline July 31    → notify July 25
+#   Q3 (Jul-Sep): deadline October 31 → notify October 25
+#   Q4 (Oct-Dec): deadline January 31 → notify January 25
+# ────────────────────────────────────────────────────────────────────────────
+_VAT_DEADLINES = {
+    # (year, deadline_date) → quarter label
+    # We generate deadlines dynamically below.
+}
+_NOTIFY_DAYS_BEFORE = 5  # send notification 5 days before deadline
+
+def _get_current_quarter_deadline_info(now: datetime) -> dict | None:
+    """Return quarter deadline info if we're in the notification window."""
+    # Quarter deadlines (ZATCA quarterly filing):
+    #   Q1 (Jan-Mar) → deadline Apr 30   → notify Apr 25-30
+    #   Q2 (Apr-Jun) → deadline Jul 31   → notify Jul 25-31
+    #   Q3 (Jul-Sep) → deadline Oct 31   → notify Oct 25-31
+    #   Q4 (Oct-Dec) → deadline Jan 31   → notify Jan 25-31
+    
+    current_year = now.year
+    current_month = now.month
+    
+    # Check each quarter's notification window
+    # Q1: notify in April of same year
+    if current_month == 4:
+        deadline_date = datetime(current_year, 4, 30, tzinfo=timezone.utc)
+        if now >= deadline_date - timedelta(days=_NOTIFY_DAYS_BEFORE):
+            return {
+                "quarter_label": "الربع الأول (يناير - مارس)",
+                "deadline_date": deadline_date,
+                "q_num": 1,
+                "deadline_year": current_year,
+            }
+    
+    # Q2: notify in July of same year
+    if current_month == 7:
+        deadline_date = datetime(current_year, 7, 31, tzinfo=timezone.utc)
+        if now >= deadline_date - timedelta(days=_NOTIFY_DAYS_BEFORE):
+            return {
+                "quarter_label": "الربع الثاني (أبريل - يونيو)",
+                "deadline_date": deadline_date,
+                "q_num": 2,
+                "deadline_year": current_year,
+            }
+    
+    # Q3: notify in October of same year
+    if current_month == 10:
+        deadline_date = datetime(current_year, 10, 31, tzinfo=timezone.utc)
+        if now >= deadline_date - timedelta(days=_NOTIFY_DAYS_BEFORE):
+            return {
+                "quarter_label": "الربع الثالث (يوليو - سبتمبر)",
+                "deadline_date": deadline_date,
+                "q_num": 3,
+                "deadline_year": current_year,
+            }
+    
+    # Q4: notify in January of NEXT year
+    if current_month == 1:
+        deadline_date = datetime(current_year, 1, 31, tzinfo=timezone.utc)
+        if now >= deadline_date - timedelta(days=_NOTIFY_DAYS_BEFORE):
+            return {
+                "quarter_label": "الربع الرابع (أكتوبر - ديسمبر)",
+                "deadline_date": deadline_date,
+                "q_num": 4,
+                "deadline_year": current_year,
+            }
+    
+    return None
+
+
 @app.post("/api/v1/agents/heartbeat")
 async def heartbeat(req: HeartbeatReq, ctx: AgentCtx = Depends(require_agent)):
     pool: asyncpg.Pool = app.state.pool
@@ -621,6 +697,37 @@ async def heartbeat(req: HeartbeatReq, ctx: AgentCtx = Depends(require_agent)):
             "UPDATE devices SET last_seen=now() WHERE id=$1 AND tenant_id=$2",
             ctx.device_id, ctx.tenant_id,
         )
+        
+        # ── VAT declaration reminder ──────────────────────────────────────
+        now = datetime.now(timezone.utc)
+        qinfo = _get_current_quarter_deadline_info(now)
+        if qinfo:
+            # Check if we already sent a notification for this quarter this year
+            already_sent = await conn.fetchval(
+                """
+                SELECT 1 FROM notifications
+                WHERE tenant_id = $1
+                  AND notification_type = 'vat_reminder'
+                  AND created_at >= $2
+                LIMIT 1
+                """,
+                ctx.tenant_id,
+                datetime(qinfo["deadline_year"], 1, 1, tzinfo=timezone.utc),
+            )
+            if not already_sent:
+                deadline_str = qinfo["deadline_date"].strftime("%Y-%m-%d")
+                msg = (
+                    f'الإقرار الضريبي ل{qinfo["quarter_label"]} جاهز للرفع. '
+                    f'الموعد النهائي: {deadline_str}'
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO notifications (tenant_id, device_id, notification_type, message)
+                    VALUES ($1, $2, 'vat_reminder', $3)
+                    """,
+                    ctx.tenant_id, ctx.device_id, msg,
+                )
+    
     return {"ok": True}
 
 

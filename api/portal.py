@@ -391,12 +391,13 @@ async def _period_data(pool, tid, did, period):
     if period == "quarter":
         today = date.today()
         qm = ((today.month - 1) // 3) * 3 + 1
-        names = {1: "Q1", 4: "Q2", 7: "Q3", 10: "Q4"}
-        q_label = f"{names.get(qm, 'Current')} {today.year}"
+        names = {1: "الأول", 4: "الثاني", 7: "الثالث", 10: "الرابع"}
+        q_label = f"الربع {names.get(qm, 'الحالي')} {today.year}"
         q_start = date(today.year, qm, 1)
         qem = qm + 2
         ld = 31 if qem in [1,3,5,7,8,10,12] else 30 if qem in [4,6,9,11] else 28
-        total_d = (date(today.year, qem, ld) - q_start).days + 1
+        q_end = date(today.year, qem, ld)
+        total_d = (q_end - q_start).days + 1
         passed = (today - q_start).days + 1
         progress = round(min(passed / max(total_d, 1) * 100, 100))
         dl_m = qem + 1 if qem < 12 else 1
@@ -420,6 +421,53 @@ async def _period_data(pool, tid, did, period):
     }
 
 
+async def _period_data_for_dates(pool, tid, did, start_date, end_date):
+    """Get period data for a specific date range (used for previous quarters)."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT document_type_id, COALESCE(SUM(total), 0) AS total, COUNT(*) AS cnt
+            FROM document
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND doc_date::date >= $3 AND doc_date::date <= $4
+              AND document_type_id = ANY($5::text[])
+            GROUP BY document_type_id
+        """, tid, did, start_date, end_date, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+
+        tax_rows = await conn.fetch("""
+            SELECT d.document_type_id, COALESCE(SUM(dt.amount), 0) AS tax_total
+            FROM document_item_tax dt
+            JOIN document_item di ON di.id = dt.document_item_id AND di.tenant_id = dt.tenant_id AND di.device_id = dt.device_id
+            JOIN document d ON d.id = di.document_id AND d.tenant_id = di.tenant_id AND d.device_id = di.device_id
+            WHERE dt.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dt.device_id = $2::uuid)
+              AND d.doc_date::date >= $3 AND d.doc_date::date <= $4
+              AND d.document_type_id = ANY($5::text[])
+            GROUP BY d.document_type_id
+        """, tid, did, start_date, end_date, [SALES, REFUND, PURCHASE])
+
+    sales = refund = purchases = stock_return = 0.0
+    tax_s = tax_r = tax_p = 0.0
+    for r in rows:
+        t = n(r["total"]); dt = r["document_type_id"]
+        if dt == SALES: sales = t
+        elif dt == REFUND: refund = abs(t)
+        elif dt == PURCHASE: purchases = t
+        elif dt == STOCK_RETURN: stock_return = abs(t)
+    for r in tax_rows:
+        t = n(r["tax_total"]); dt = r["document_type_id"]
+        if dt == SALES: tax_s = t
+        elif dt == REFUND: tax_r = abs(t)
+        elif dt == PURCHASE: tax_p = t
+
+    return {
+        "sales": round(sales, 2), "refund": round(refund, 2),
+        "net_sales": round(sales - refund, 2), "purchases": round(purchases, 2),
+        "stock_return": round(stock_return, 2),
+        "tax_sales": round(tax_s - tax_r, 2), "tax_refund": round(tax_r, 2),
+        "tax_purchases": round(tax_p, 2),
+        "vat_due": round((tax_s - tax_r) - tax_p, 2),
+    }
+
+
 @router.get("/month")
 async def portal_month(request: Request, tenant_id: Optional[str] = None):
     auth = await _get_auth(request)
@@ -431,7 +479,60 @@ async def portal_month(request: Request, tenant_id: Optional[str] = None):
 async def portal_quarter(request: Request, tenant_id: Optional[str] = None):
     auth = await _get_auth(request)
     tid, did = _scope(auth, tenant_id)
-    return await _period_data(request.app.state.pool, tid, did, "quarter")
+    pool = request.app.state.pool
+    
+    # Current quarter
+    current = await _period_data(pool, tid, did, "quarter")
+    
+    # Previous quarter
+    today = date.today()
+    qm = ((today.month - 1) // 3) * 3 + 1
+    
+    # Calculate previous quarter
+    if qm == 1:
+        prev_qm = 10
+        prev_year = today.year - 1
+    else:
+        prev_qm = qm - 3
+        prev_year = today.year
+    
+    prev_start = date(prev_year, prev_qm, 1)
+    prev_em = prev_qm + 2
+    prev_ld = 31 if prev_em in [1,3,5,7,8,10,12] else 30 if prev_em in [4,6,9,11] else 28
+    prev_end = date(prev_year, prev_em, prev_ld)
+    
+    # Check if previous quarter should be shown (within 30 days after end)
+    days_after_end = (today - prev_end).days
+    show_previous = 0 <= days_after_end <= 30
+    
+    if show_previous:
+        prev_data = await _period_data_for_dates(pool, tid, did, prev_start, prev_end)
+        
+        # Quarter label
+        names = {1: "الأول", 4: "الثاني", 7: "الثالث", 10: "الرابع"}
+        prev_label = f"الربع {names.get(prev_qm, 'السابق')} {prev_year}"
+        prev_data["quarter_label"] = prev_label
+        prev_data["quarter_start"] = prev_start.isoformat()
+        prev_data["quarter_end"] = prev_end.isoformat()
+        
+        # Calculate deadline (31 days after quarter end)
+        dl_m = prev_em + 1 if prev_em < 12 else 1
+        dl_y = prev_year if prev_em < 12 else prev_year + 1
+        dl_ld = 31 if dl_m in [1,3,5,7,8,10,12] else 30
+        deadline = date(dl_y, dl_m, dl_ld)
+        days_until_deadline = max((deadline - today).days, 0)
+        
+        prev_data["days_until_deadline"] = days_until_deadline
+        prev_data["is_previous"] = True
+        prev_data["status"] = "completed"
+    else:
+        prev_data = None
+    
+    return {
+        "current": current,
+        "previous": prev_data,
+        "show_previous": show_previous
+    }
 
 
 # === QUARTER DETAILS ===

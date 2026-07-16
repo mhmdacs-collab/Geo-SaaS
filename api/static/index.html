@@ -186,6 +186,35 @@ button,input,select{font-family:inherit}
 .notif-type-tax_ready{border-right-color:var(--green)!important}
 .notif-type-store_open{border-right-color:var(--brand)!important}
 .notif-type-auto_close{border-right-color:var(--amber)!important}
+.notif-type-vat_reminder{border-right-color:var(--green)!important}
+
+/* ── QUARTER CARDS ── */
+.quarter-card{background:#fff;border-radius:var(--r);box-shadow:var(--sh);margin-bottom:16px;overflow:hidden;border:1px solid var(--border)}
+.quarter-current{border-right:4px solid var(--brand)}
+.quarter-previous{border-right:4px solid var(--green);opacity:.9}
+.qc-header{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border)}
+.qc-badge{font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;text-transform:uppercase}
+.qc-current{background:var(--brand);color:#fff}
+.qc-done{background:var(--green);color:#fff}
+.qc-title{font-size:15px;font-weight:700;color:var(--text)}
+.qc-period{padding:8px 20px;font-size:12px;color:var(--muted);background:var(--bg)}
+.qc-countdown{padding:12px 20px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.qc-countdown span{font-size:12px;color:var(--text);font-weight:600}
+.qc-deadline{padding:10px 20px;font-size:12px;color:var(--amber);font-weight:600;background:var(--amber-l)}
+.qc-numbers{padding:16px 20px}
+.qc-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.qc-row:last-child{border-bottom:none}
+.qc-label{font-size:13px;color:var(--muted);font-weight:500}
+.qc-val{font-size:14px;font-weight:700}
+.qc-sales{color:var(--brand)}
+.qc-purchase{color:var(--red)}
+.qc-due{color:var(--amber);font-size:16px}
+.qc-total{background:var(--bg);margin:8px -20px -16px;padding:12px 20px;border-radius:0 0 var(--r) var(--r)}
+.qc-footer{padding:12px 20px;border-top:1px solid var(--border);text-align:center}
+.btn-download{background:var(--brand);color:#fff;border:none;padding:10px 24px;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;transition:var(--tr)}
+.btn-download:hover{background:var(--brand-d);transform:translateY(-1px)}
+.btn-download-final{background:var(--green)}
+.btn-download-final:hover{background:#059669}
 
 /* ── MODAL ── */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:999;opacity:0;pointer-events:none;transition:opacity .2s;padding:20px}
@@ -724,34 +753,69 @@ function renderMonthData(d) {
 function renderQuarterData(d) {
   var html = '';
 
-  // 1. مبيعات الربع
-  html += '<div class="mgrid">'
-    + metricCard('mc-s', 'إجمالي مبيعات الربع', fmt(d.sales), '', salesIcon())
-    + metricCard('mc-r', 'مرتجع مبيعات الربع', fmt(d.refund), '', refundIcon())
+  // ── الربع الحالي (جاري) ──────────────────────────────────────
+  var cur = d.current || d;
+  html += '<div class="quarter-card quarter-current">'
+    + '<div class="qc-header">'
+    + '<div class="qc-badge qc-current">جاري</div>'
+    + '<div class="qc-title">' + (cur.period_label || 'الربع الحالي') + '</div>'
     + '</div>';
 
-  // 2. صافي مبيعات الربع (full width)
-  html += '<div class="mgrid">'
-    + metricCard('mc-n mc-full', 'صافي مبيعات الربع', fmt(d.net_sales), '', netIcon())
+  // شريط التقدم والعد التنازلي
+  if (cur.days_remaining !== undefined) {
+    html += '<div class="qc-countdown">'
+      + '<span>⏳ ' + cur.days_remaining + ' يوم متبقي للموعد النهائي</span>'
+      + '<div class="prog-bg"><div class="prog-fill" style="width:' + (cur.quarter_progress || 0) + '%"></div></div>'
+      + '</div>';
+  }
+
+  // الأرقام
+  html += '<div class="qc-numbers">'
+    + '<div class="qc-row"><span class="qc-label">صافي المبيعات</span><span class="qc-val qc-sales">' + fmt(cur.net_sales) + ' ريال</span></div>'
+    + '<div class="qc-row"><span class="qc-label">صافي المشتريات</span><span class="qc-val qc-purchase">' + fmt(cur.purchases - (cur.stock_return || 0)) + ' ريال</span></div>'
+    + '<div class="qc-row qc-total"><span class="qc-label">المستحق للهيئة</span><span class="qc-val qc-due">' + fmt(cur.vat_due) + ' ريال</span></div>'
     + '</div>';
 
-  // 3. مشتريات الربع
-  html += '<div class="mgrid">'
-    + metricCard('mc-p', 'إجمالي مشتريات الربع', fmt(d.purchases), '', purchaseIcon())
-    + metricCard('mc-r', 'مرتجع مشتريات الربع', fmt(d.stock_return || 0), '', returnIcon())
+  html += '<div class="qc-footer">'
+    + '<button class="btn-download" onclick="doPrint(\'current\')">📥 تحميل تقرير مؤقت</button>'
     + '</div>';
+  html += '</div>';
 
-  // 4. صافي مشتريات الربع (full width)
-  html += '<div class="mgrid">'
-    + metricCard('mc-n mc-full', 'صافي مشتريات الربع', fmt(d.purchases - (d.stock_return || 0)), '', netIcon())
-    + '</div>';
+  // ── الربع السابق (منتهي) ─────────────────────────────────────
+  if (d.show_previous && d.previous) {
+    var prev = d.previous;
+    var periodStr = '';
+    if (prev.quarter_start && prev.quarter_end) {
+      var s = new Date(prev.quarter_start);
+      var e = new Date(prev.quarter_end);
+      var mNames = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+      periodStr = mNames[s.getMonth()] + ' - ' + mNames[e.getMonth()] + ' ' + s.getFullYear();
+    }
+    html += '<div class="quarter-card quarter-previous">'
+      + '<div class="qc-header">'
+      + '<div class="qc-badge qc-done">منتهي ✓</div>'
+      + '<div class="qc-title">' + (prev.quarter_label || 'الربع السابق') + '</div>'
+      + '</div>';
+    if (periodStr) {
+      html += '<div class="qc-period">' + periodStr + '</div>';
+    }
+    if (prev.days_until_deadline !== undefined) {
+      html += '<div class="qc-deadline">⏰ متبقي ' + prev.days_until_deadline + ' يوم للموعد النهائي</div>';
+    }
+    html += '<div class="qc-numbers">'
+      + '<div class="qc-row"><span class="qc-label">صافي المبيعات</span><span class="qc-val qc-sales">' + fmt(prev.net_sales) + ' ريال</span></div>'
+      + '<div class="qc-row"><span class="qc-label">صافي المشتريات</span><span class="qc-val qc-purchase">' + fmt(prev.purchases - (prev.stock_return || 0)) + ' ريال</span></div>'
+      + '<div class="qc-row qc-total"><span class="qc-label">المستحق للهيئة</span><span class="qc-val qc-due">' + fmt(prev.vat_due) + ' ريال</span></div>'
+      + '</div>';
+    html += '<div class="qc-footer">'
+      + '<button class="btn-download btn-download-final" onclick="doPrint(\'previous\')">📥 تحميل التقرير النهائي</button>'
+      + '</div>';
+    html += '</div>';
+  }
 
-  // 5. الإقرار الضريبي
-  html += renderTaxSection(d);
-
-  // 6. مقارنة الفروع (only when all branches)
-  if (CURRENT_BRANCH === null && d.branch_breakdown) {
-    html += renderBranchComparePanel(d.branch_breakdown);
+  // ── مقارنة الفروع ────────────────────────────────────────────
+  if (CURRENT_BRANCH === null && cur.branch_breakdown) {
+    html += renderBranchComparePanel(cur.branch_breakdown);
   }
 
   document.getElementById('dashboardContent').innerHTML = html;
@@ -948,9 +1012,17 @@ function saveOnboard() {
 }
 
 /* ── PRINT ── */
-function doPrint() {
+function doPrint(quarterType) {
   if (!lastQuarterData) { alert('لا توجد بيانات ضريبية'); return; }
-  var d = lastQuarterData;
+  
+  // Determine which quarter to print
+  var d;
+  if (quarterType === 'previous' && lastQuarterData.show_previous && lastQuarterData.previous) {
+    d = lastQuarterData.previous;
+  } else {
+    d = lastQuarterData.current || lastQuarterData;
+  }
+  
   var html = '<div class="print-wrap">'
     + '<div class="print-header">'
     + '<h1>' + STORE + '</h1>'
