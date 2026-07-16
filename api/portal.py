@@ -421,6 +421,10 @@ async def _period_data(pool, tid, did, period):
         "branch_breakdown": [{"device_id": str(r["device_id"]), "branch_name": r["branch_name"], "total": round(n(r["total"]), 2)} for r in branch_rows],
         "quarter_progress": progress, "days_remaining": days_remaining,
         "period_label": q_label if q_label else date.today().strftime("%B %Y"),
+        "sales_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == SALES),
+        "refund_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == REFUND),
+        "purchase_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == PURCHASE),
+        "stock_return_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == STOCK_RETURN),
     }
 
 
