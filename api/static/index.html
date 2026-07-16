@@ -233,21 +233,53 @@ button,input,select{font-family:inherit}
   body{background:#fff!important}
   #appPage,#loginPage,.modal{display:none!important}
   #printDoc{display:block!important}
-  @page{size:A4;margin:10mm}
-  .print-wrap{max-width:210mm;margin:0 auto;font-family:'Cairo',sans-serif;color:#0f172a;direction:rtl}
-  .print-header{text-align:center;border-bottom:3px solid #00BCD4;padding-bottom:10px;margin-bottom:12px}
-  .print-header h1{font-size:20px;font-weight:900;margin-bottom:6px;color:#0891B2}
-  .print-header p{font-size:12px;color:#64748b;margin:3px 0}
-  .print-table{width:100%;border-collapse:collapse;font-size:11px}
-  .print-table th{background:#00BCD4;color:#fff;padding:8px 6px;font-weight:700;border:1px solid #0891B2;text-align:right}
-  .print-table td{padding:6px;border:1px solid #e2e8f0;text-align:right}
-  .print-section-head{background:#E0F7FA;font-weight:800;color:#0891B2;text-align:center;padding:8px;border:1px solid #00BCD4;font-size:13px}
-  .print-row-label{font-weight:600;background:#f8fafc}
-  .print-row-total{background:#E0F7FA;font-weight:800;color:#0891B2;border-top:2px solid #00BCD4}
+  @page{size:A4;margin:12mm}
+  
+  .print-wrap{max-width:210mm;margin:0 auto;font-family:'Cairo','Segoe UI',sans-serif;color:#0f172a;direction:rtl}
+  
+  /* Header */
+  .print-header{text-align:center;padding:15px 0 12px;border-bottom:3px solid #00BCD4;margin-bottom:15px}
+  .print-header h1{font-size:22px;font-weight:900;color:#0891B2;margin:0 0 8px}
+  .print-header .subtitle{font-size:13px;color:#64748b;margin:4px 0}
+  .print-header .tax-num{font-size:12px;color:#475569;font-weight:600;margin-top:8px}
+  
+  /* Meta info */
+  .print-meta{display:flex;justify-content:space-between;padding:10px;background:#f8fafc;border-radius:8px;margin-bottom:15px;font-size:11px}
+  .print-meta div{flex:1}
+  .print-meta strong{color:#0891B2;font-weight:700}
+  
+  /* Tables */
+  .print-section{margin-bottom:20px}
+  .print-section-head{background:linear-gradient(135deg,#E0F7FA 0%,#B2EBF2 100%);color:#0891B2;padding:12px;text-align:center;font-size:15px;font-weight:800;border:2px solid #00BCD4;border-radius:6px;margin-bottom:10px}
+  .print-table{width:100%;border-collapse:collapse;font-size:11px;background:#fff}
+  .print-table thead th{background:#00BCD4;color:#fff;padding:10px 8px;font-weight:700;border:1px solid #0891B2;text-align:right;font-size:12px}
+  .print-table tbody td{padding:8px;border:1px solid #e2e8f0;text-align:right;vertical-align:middle}
+  
+  /* Row styles */
+  .print-row-label{font-weight:600;color:#1e293b;padding-right:12px}
+  .print-row-sublabel{padding-right:24px;color:#475569;font-size:10px}
   .print-val{font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums}
   .print-val-zero{color:#94a3b8}
-  .print-grand-total{background:#00BCD4;color:#fff;font-weight:900;font-size:13px;text-align:center;padding:10px}
-  .print-footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:12px;border-top:1px solid #e2e8f0;padding-top:6px}
+  
+  /* Total row */
+  .print-row-total{background:#E0F7FA;font-weight:800;color:#0891B2;border-top:2px solid #00BCD4}
+  .print-row-total td{padding:10px 8px;font-size:12px}
+  
+  /* Grand total */
+  .print-grand-total-row{background:#00BCD4;color:#fff;font-weight:900;font-size:14px}
+  .print-grand-total-row td{padding:12px 8px;border:2px solid #0891B2}
+  .print-grand-total-label{font-size:13px}
+  .print-grand-total-value{font-size:16px;text-align:left}
+  
+  /* Negative VAT */
+  .print-negative{background:#f59e0b!important;color:#fff!important}
+  
+  /* Separator */
+  .print-separator{height:15px;background:linear-gradient(to bottom,#f8fafc 0%,transparent 100%)}
+  
+  /* Footer */
+  .print-footer{text-align:center;font-size:9px;color:#94a3b8;margin-top:20px;padding-top:10px;border-top:1px solid #e2e8f0}
+  .print-footer .system-info{font-size:8px;margin-top:4px;color:#cbd5e1}
 }
 
 /* ── MOBILE ── */
@@ -1019,46 +1051,100 @@ function saveOnboard() {
 function doPrint(quarterType) {
   if (!lastQuarterData) { alert('لا توجد بيانات ضريبية'); return; }
   var d = (quarterType === 'previous' && lastQuarterData.show_previous && lastQuarterData.previous) ? lastQuarterData.previous : (lastQuarterData.current || lastQuarterData);
+  
   var s = fmt(d.sales), z = fmt(0), taxS = fmt(d.tax_sales);
   var p = fmt(d.purchases), taxP = fmt(d.tax_purchases);
   var pNet = fmt(d.purchases - (d.stock_return||0));
   var sNet = fmt(d.net_sales), vatDue = fmt(d.vat_due);
   var isNeg = d.vat_due < 0;
+  var salesCount = d.sales_invoice_count || 0;
+  var purchCount = d.purchase_invoice_count || 0;
+  var refundCount = d.refund_invoice_count || 0;
+  var stockRetCount = d.stock_return_count || 0;
+  
+  var today = new Date().toLocaleDateString('ar-SA');
+  var periodLabel = d.period_label || 'الربع الحالي';
+  
   var html = '<div class="print-wrap">'
-    + '<div class="print-header"><h1>' + STORE + '</h1>'
-    + '<p>الإقرار الضريبي - ' + (d.period_label||'') + '</p>'
-    + '<p>الرقم الضريبي: ' + TAX_NUM + '</p></div>'
+    // Header
+    + '<div class="print-header">'
+    + '<h1>' + STORE + '</h1>'
+    + '<div class="subtitle">الإقرار الضريبي للقيمة المضافة</div>'
+    + '<div class="tax-num">الرقم الضريبي: ' + TAX_NUM + '</div>'
+    + '</div>'
+    
+    // Meta info
+    + '<div class="print-meta">'
+    + '<div><strong>الفترة:</strong> ' + periodLabel + '</div>'
+    + '<div><strong>تاريخ التقرير:</strong> ' + today + '</div>'
+    + '</div>'
+    
+    // Sales Section
+    + '<div class="print-section">'
+    + '<div class="print-section-head">ضريبة القيمة المضافة على المبيعات</div>'
     + '<table class="print-table">'
-    // Sales section
-    + '<tr><th colspan="4" class="print-section-head" style="background:#f1f5f9;color:#0891B2">ضريبة القيمة المضافة على المبيعات</th></tr>'
-    + '<tr><th>البند</th><th>المبلغ</th><th>مبلغ التعديل</th><th>مبلغ الضريبة</th></tr>'
-    + '<tr><td class="print-row-label">المبيعات الخاضعة للضريبة للنسبة الأساسية</td><td class="print-val">' + s + '</td><td></td><td class="print-val">' + taxS + '</td></tr>'
+    + '<thead><tr><th style="width:50%">البند</th><th style="width:20%">المبلغ</th><th style="width:15%">مبلغ التعديل</th><th style="width:15%">مبلغ الضريبة</th></tr></thead>'
+    + '<tbody>'
+    + '<tr><td class="print-row-label">المبيعات الخاضعة للضريبة للنسبة الأساسية (15%)</td><td class="print-val">' + s + '</td><td></td><td class="print-val">' + taxS + '</td></tr>'
+    + '<tr><td class="print-row-sublabel">عدد الفواتير: ' + salesCount + '</td><td></td><td></td><td></td></tr>'
     + '<tr><td class="print-row-label">المبيعات للمواطنين (صحية - تعليم أهلي - مسكن أول)</td><td class="print-val-zero">' + z + '</td><td></td><td class="print-val-zero">' + z + '</td></tr>'
     + '<tr><td class="print-row-label">المبيعات الخاضعة للضريبة لنسبة صفر</td><td class="print-val-zero">' + z + '</td><td></td><td class="print-val-zero">' + z + '</td></tr>'
     + '<tr><td class="print-row-label">الصادرات</td><td class="print-val-zero">' + z + '</td><td></td><td class="print-val-zero">' + z + '</td></tr>'
     + '<tr><td class="print-row-label">المبيعات المعفاة</td><td class="print-val-zero">' + z + '</td><td></td><td class="print-val-zero">' + z + '</td></tr>'
-    + '<tr><td class="print-row-total">إجمالي المبيعات</td><td class="print-val">' + sNet + '</td><td class="print-val-zero">' + z + '</td><td class="print-val">' + taxS + '</td></tr>'
-    // Purchases section
-    + '<tr><th colspan="4" class="print-section-head" style="background:#f1f5f9;color:#0891B2">ضريبة القيمة المضافة على المشتريات</th></tr>'
-    + '<tr><th>البند</th><th>المبلغ</th><th>مبلغ التعديل</th><th>مبلغ الضريبة</th></tr>'
+    + '<tr class="print-row-total"><td>إجمالي المبيعات</td><td class="print-val">' + sNet + '</td><td class="print-val-zero">' + z + '</td><td class="print-val">' + taxS + '</td></tr>'
+    + '</tbody></table></div>'
+    
+    // Separator
+    + '<div class="print-separator"></div>'
+    
+    // Purchases Section
+    + '<div class="print-section">'
+    + '<div class="print-section-head">ضريبة القيمة المضافة على المشتريات</div>'
+    + '<table class="print-table">'
+    + '<thead><tr><th style="width:50%">البند</th><th style="width:20%">المبلغ</th><th style="width:15%">مبلغ التعديل</th><th style="width:15%">مبلغ الضريبة</th></tr></thead>'
+    + '<tbody>'
     + '<tr><td class="print-row-label">المشتريات الخاضعة للضريبة للنسبة الأساسية 15%</td><td class="print-val">' + p + '</td><td class="print-val-zero">0.00</td><td class="print-val">' + taxP + '</td></tr>'
+    + '<tr><td class="print-row-sublabel">عدد الفواتير: ' + purchCount + '</td><td></td><td></td><td></td></tr>'
     + '<tr><td class="print-row-label">المشتريات الخاضعة للضريبة للنسبة الأساسية 5%</td><td class="print-val-zero">' + z + '</td><td class="print-val-zero">0.00</td><td class="print-val-zero">' + z + '</td></tr>'
     + '<tr><td class="print-row-label">الاستيرادات الخاضعة لضريبة القيمة المضافة بالنسبة الأساسية والتي تدفع للجمارك</td><td class="print-val-zero">0.00</td><td class="print-val-zero">0.00</td><td class="print-val-zero">0.00</td></tr>'
     + '<tr><td class="print-row-label">المشتريات الخاضعة لضريبة القيمة المضافة التي يطبق عليها آلية الاحتساب العكسي</td><td class="print-val-zero">0.00</td><td class="print-val-zero">0.00</td><td class="print-val-zero">0.00</td></tr>'
     + '<tr><td class="print-row-label">المشتريات الخاضعة لنسبة الصفرية</td><td class="print-val-zero">0.00</td><td class="print-val-zero">0.00</td><td class="print-val-zero">0.00</td></tr>'
     + '<tr><td class="print-row-label">المشتريات المعفاة</td><td class="print-val-zero">' + z + '</td><td class="print-val-zero">0.00</td><td class="print-val-zero">' + z + '</td></tr>'
-    + '<tr><td class="print-row-total">إجمالي المشتريات</td><td class="print-val">' + pNet + '</td><td class="print-val-zero">0.00</td><td class="print-val">' + taxP + '</td></tr>'
-    // Grand total
-    + '<tr><td class="print-grand-total" colspan="4">إجمالي ضريبة القيمة المضافة المستحقة عن الفترة الضريبية الحالية</td>'
-    + '<td class="print-grand-total" colspan="4" style="text-align:left">' + vatDue + '</td></tr>'
-    // Adjustments
-    + '<tr><td class="print-row-label" colspan="2">تصحيحات من الفترات السابقة (بين 5000 ريال)</td><td class="print-val-zero">0.00</td><td class="print-val-zero">0.00</td></tr>'
-    + '<tr><td class="print-row-label" colspan="2">ضريبة القيمة المضافة التي تم ترحيلها من الفترة / الفترات السابقة</td><td class="print-val-zero">0.00</td><td class="print-val-zero">0.00</td></tr>'
-    // Final net
-    + '<tr><td class="print-grand-total" colspan="4" style="' + (isNeg ? 'background:#f59e0b' : '') + '">صافي ضريبة القيمة المضافة المستحقة</td>'
-    + '<td class="print-grand-total" colspan="4" style="' + (isNeg ? 'background:#f59e0b' : '') + ';text-align:left">' + vatDue + '</td></tr>'
-    + '</table>'
-    + '<div class="print-footer">تم إنشاء هذا التقرير بواسطة نظام المحاسب الذكي</div></div>';
+    + '<tr class="print-row-total"><td>إجمالي المشتريات</td><td class="print-val">' + pNet + '</td><td class="print-val-zero">0.00</td><td class="print-val">' + taxP + '</td></tr>'
+    + '</tbody></table></div>'
+    
+    // Grand Total
+    + '<table class="print-table" style="margin-top:15px">'
+    + '<tbody>'
+    + '<tr class="print-grand-total-row ' + (isNeg ? 'print-negative' : '') + '">'
+    + '<td colspan="2" class="print-grand-total-label">إجمالي ضريبة القيمة المضافة المستحقة عن الفترة الضريبية الحالية</td>'
+    + '<td colspan="2" class="print-grand-total-value">' + vatDue + '</td>'
+    + '</tr>'
+    + '<tr><td colspan="2" class="print-row-label" style="font-size:10px">تصحيحات من الفترات السابقة (بين 5000 ريال)</td><td class="print-val-zero" style="font-size:10px">0.00</td><td class="print-val-zero" style="font-size:10px">0.00</td></tr>'
+    + '<tr><td colspan="2" class="print-row-label" style="font-size:10px">ضريبة القيمة المضافة التي تم ترحيلها من الفترة / الفترات السابقة</td><td class="print-val-zero" style="font-size:10px">0.00</td><td class="print-val-zero" style="font-size:10px">0.00</td></tr>'
+    + '<tr class="print-grand-total-row ' + (isNeg ? 'print-negative' : '') + '">'
+    + '<td colspan="2" class="print-grand-total-label">صافي ضريبة القيمة المضافة المستحقة</td>'
+    + '<td colspan="2" class="print-grand-total-value">' + vatDue + '</td>'
+    + '</tr>'
+    + '</tbody></table>'
+    
+    // Summary stats
+    + '<div style="margin-top:15px;padding:12px;background:#f8fafc;border-radius:6px;font-size:11px">'
+    + '<div style="font-weight:700;color:#0891B2;margin-bottom:8px">ملخص العمليات:</div>'
+    + '<div style="display:flex;gap:20px">'
+    + '<div>📄 فواتير مبيعات: <strong>' + salesCount + '</strong></div>'
+    + '<div>📄 فواتير مشتريات: <strong>' + purchCount + '</strong></div>'
+    + '<div>↩️ مرتجع مبيعات: <strong>' + refundCount + '</strong></div>'
+    + '<div>↩️ مرتجع مشتريات: <strong>' + stockRetCount + '</strong></div>'
+    + '</div></div>'
+    
+    // Footer
+    + '<div class="print-footer">'
+    + '<div>تم إنشاء هذا التقرير بواسطة نظام المحاسب الذكي</div>'
+    + '<div class="system-info">النظام: Aronium POS | الإصدار: 1.50 | معرف النظام: ' + TAX_NUM + '</div>'
+    + '</div>'
+    + '</div>';
+  
   document.getElementById('printDoc').innerHTML = html;
   window.print();
 }

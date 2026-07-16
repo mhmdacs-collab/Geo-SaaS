@@ -465,6 +465,10 @@ async def _period_data_for_dates(pool, tid, did, start_date, end_date):
         "tax_sales": round(tax_s - tax_r, 2), "tax_refund": round(tax_r, 2),
         "tax_purchases": round(tax_p, 2),
         "vat_due": round((tax_s - tax_r) - tax_p, 2),
+        "sales_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == SALES),
+        "refund_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == REFUND),
+        "purchase_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == PURCHASE),
+        "stock_return_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == STOCK_RETURN),
     }
 
 
