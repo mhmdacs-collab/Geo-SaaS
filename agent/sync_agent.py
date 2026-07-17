@@ -490,7 +490,9 @@ class ApiClient:
 
 # ─── Subscription Error ──────────────────────────────────────────────────────
 class SubscriptionError(Exception):
-    pass
+    def __init__(self, message, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def _friendly_http_error(e: requests.HTTPError) -> str:
