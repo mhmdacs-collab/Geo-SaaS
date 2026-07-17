@@ -373,7 +373,6 @@ button,input,select{font-family:inherit}
       </div>
       <div class="hdr-info">
         <h1 id="hdrStore">—</h1>
-        <span id="subBadge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;margin-right:8px;cursor:pointer" onclick="openSettings()"></span>
         <p id="hdrTax">—</p>
       </div>
     </div>
@@ -1041,7 +1040,7 @@ function updateSubExpiry() {
   var now = new Date();
   var daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
   
-  var dateStr = expDate.toLocaleDateString('ar-SA', {year: 'numeric', month: 'long', day: 'numeric'});
+  var dateStr = expDate.toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'});
   
   if (statusEl) statusEl.textContent = daysLeft < 0 ? 'منتهي' : 'نشط';
   if (expiryEl) expiryEl.textContent = dateStr;
