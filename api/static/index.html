@@ -1030,13 +1030,11 @@ function openSettings() {
 
 function updateSubExpiry() {
   var bannerCard = document.getElementById('subBannerCard');
-  var badgeEl = document.getElementById('subBadge');
   var statusEl = document.getElementById('subStatus');
   var expiryEl = document.getElementById('subExpiry');
   
   if (!SUB_EXP) {
     if (bannerCard) bannerCard.style.display = 'none';
-    if (badgeEl) badgeEl.style.display = 'none';
     if (statusEl) statusEl.textContent = 'نشط';
     if (expiryEl) expiryEl.textContent = '—';
     return;
@@ -1045,16 +1043,17 @@ function updateSubExpiry() {
   var expDate = new Date(SUB_EXP);
   var now = new Date();
   var daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+  var isExpired = expDate <= now;
   
   var dateStr = expDate.toLocaleDateString('en-US', {year: 'numeric', month: 'long', day: 'numeric'});
   
-  if (statusEl) statusEl.textContent = daysLeft < 0 ? 'منتهي' : 'نشط';
+  if (statusEl) statusEl.textContent = isExpired ? 'منتهي' : 'نشط';
   if (expiryEl) expiryEl.textContent = dateStr;
 
   // عند انتهاء الاشتراك: تغيير شريط المزامنة إلى "المزامنة متوقفة"
   var syncInfo = document.getElementById('syncInfo');
   var syncDot = document.querySelector('.sync-dot');
-  if (daysLeft < 0) {
+  if (isExpired) {
     if (syncInfo) syncInfo.textContent = 'المزامنة متوقفة — انتهى الاشتراك';
     if (syncDot) syncDot.style.background = '#ef4444';
   } else {
