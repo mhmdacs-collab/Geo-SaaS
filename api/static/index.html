@@ -1290,6 +1290,7 @@ document.getElementById('loginUser').addEventListener('keydown', function(e) {
 /* ── NOTIFICATIONS ── */
 var notifPanelOpen = false;
 var notifInterval = null;
+var subInterval = null;
 
 function toggleNotifications() {
   var panel = document.getElementById('notifPanel');
@@ -1419,16 +1420,34 @@ function updateNotificationBadgeAfterMark() {
   }, 300);
 }
 
+function refreshSubExpiry() {
+  fetch(API + '/client', { headers: apiHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.sub_expires !== undefined) {
+        SUB_EXP = d.sub_expires || null;
+        updateSubExpiry();
+      }
+    })
+    .catch(function() {});
+}
+
 function startNotificationPolling() {
   if (notifInterval) clearInterval(notifInterval);
+  if (subInterval) clearInterval(subInterval);
   fetchNotifications();
   notifInterval = setInterval(fetchNotifications, 60000);
+  subInterval = setInterval(refreshSubExpiry, 300000); // every 5 minutes
 }
 
 function stopNotificationPolling() {
   if (notifInterval) {
     clearInterval(notifInterval);
     notifInterval = null;
+  }
+  if (subInterval) {
+    clearInterval(subInterval);
+    subInterval = null;
   }
 }
 
