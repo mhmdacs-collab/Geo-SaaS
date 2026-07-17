@@ -419,12 +419,13 @@ button,input,select{font-family:inherit}
     <div class="main">
       <div class="sync-bar">
         <div><span class="sync-dot"></span> <span id="syncInfo">—</span></div>
-        <div id="subBanner"></div>
         <button class="sync-btn" onclick="refreshData()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
           تحديث
         </button>
       </div>
+
+      <div id="subBannerCard" style="display:none"></div>
 
       <div class="tabs">
         <button class="tab active" onclick="switchTab('today',this)">اليوم</button>
@@ -1023,13 +1024,13 @@ function openSettings() {
 }
 
 function updateSubExpiry() {
-  var bannerEl = document.getElementById('subBanner');
+  var bannerCard = document.getElementById('subBannerCard');
   var badgeEl = document.getElementById('subBadge');
   var statusEl = document.getElementById('subStatus');
   var expiryEl = document.getElementById('subExpiry');
   
   if (!SUB_EXP) {
-    if (bannerEl) bannerEl.innerHTML = '';
+    if (bannerCard) bannerCard.style.display = 'none';
     if (badgeEl) badgeEl.style.display = 'none';
     if (statusEl) statusEl.textContent = 'نشط';
     if (expiryEl) expiryEl.textContent = '—';
@@ -1071,27 +1072,38 @@ function updateSubExpiry() {
     }
   }
   
-  // بنر بجانب آخر مزامنة
-  if (bannerEl) {
+  // بطاقة البنر المنفصلة تحت شريط المزامنة
+  if (bannerCard) {
     if (daysLeft <= 3 && daysLeft >= 0) {
+      var icon = '';
       var msg = '';
-      var color = '';
+      var bg = '';
+      var border = '';
       if (daysLeft === 3) {
-        msg = 'اشتراكك ينتهي خلال 3 أيام - يرجى التواصل لتجديده';
-        color = '#fef3c7';
+        icon = '';
+        msg = 'اشتراكك ينتهي خلال 3 أيام — يرجى التواصل لتجديده';
+        bg = '#fffbeb';
+        border = '#f59e0b';
       } else if (daysLeft === 2) {
-        msg = '️ يومان متبقيان على انتهاء اشتراكك';
-        color = '#fed7aa';
+        icon = '🟠';
+        msg = 'يومان متبقيان على انتهاء اشتراكك';
+        bg = '#fff7ed';
+        border = '#f97316';
       } else if (daysLeft === 1) {
-        msg = '🔴 غدًا ينتهي اشتراكك - تواصل مع الدعم فوراً';
-        color = '#fecaca';
+        icon = '🟠';
+        msg = 'غداً ينتهي اشتراكك — تواصل مع الدعم فوراً';
+        bg = '#fef2f2';
+        border = '#ef4444';
       } else {
-        msg = '⛔ انتهى اشتراكك - تواصل مع الدعم لتجنب فقدان البيانات';
-        color = '#fca5a5';
+        icon = '🔴';
+        msg = 'انتهى اشتراكك — تواصل مع الدعم لتجنب فقدان البيانات';
+        bg = '#fef2f2';
+        border = '#dc2626';
       }
-      bannerEl.innerHTML = '<div style="background:' + color + ';color:#1a1a1a;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;margin-top:4px" onclick="openSettings()">' + msg + '</div>';
+      bannerCard.style.display = 'block';
+      bannerCard.innerHTML = '<div style="background:' + bg + ';border:1px solid ' + border + ';border-radius:12px;padding:12px 18px;font-size:13px;font-weight:600;color:#1a1a1a;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:12px" onclick="openSettings()"><span style="font-size:18px">' + icon + '</span><span>' + msg + '</span></div>';
     } else {
-      bannerEl.innerHTML = '';
+      bannerCard.style.display = 'none';
     }
   }
 }
