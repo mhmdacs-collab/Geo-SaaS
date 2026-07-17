@@ -716,7 +716,14 @@ async def heartbeat(req: HeartbeatReq, ctx: AgentCtx = Depends(require_agent), r
                     ctx.tenant_id, ctx.device_id,
                 )
                 if not already_sent:
-                    msg = f"اشتراكك ينتهي خلال {days_left} يوم{'ين' if days_left == 2 else ''}. يرجى التواصل لتجديده."
+                    if days_left == 0:
+                        msg = "اشتراكك ينتهي اليوم. يرجى التواصل لتجديده."
+                    elif days_left == 1:
+                        msg = "اشتراكك ينتهي غداً. يرجى التواصل لتجديده."
+                    elif days_left == 2:
+                        msg = "اشتراكك ينتهي خلال يومين. يرجى التواصل لتجديده."
+                    else:
+                        msg = f"اشتراكك ينتهي خلال {days_left} أيام. يرجى التواصل لتجديده."
                     await conn.execute(
                         """
                         INSERT INTO notifications (tenant_id, device_id, notification_type, message)

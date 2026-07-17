@@ -164,7 +164,8 @@ async def portal_login(body: dict, request: Request):
                    COALESCE(close_hour, 0) AS close_hour,
                    COALESCE(onboarded, false) AS onboarded,
                    password,
-                   COALESCE(status, 'active') AS sub_status
+                   COALESCE(status, 'active') AS sub_status,
+                   expires_at
             FROM tenants WHERE tax_number = $1
         """, tax)
         if not tenant:
@@ -219,6 +220,7 @@ async def portal_login(body: dict, request: Request):
         "branches": branches,
         "support_wa": getattr(state, "support_wa", "966558110150"),
         "has_custom_password": has_custom,
+        "sub_expires": tenant["expires_at"].isoformat() if tenant["expires_at"] else None,
     }
 
 
