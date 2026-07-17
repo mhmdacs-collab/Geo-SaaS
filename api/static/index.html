@@ -746,6 +746,12 @@ function loadQuarterData() {
 }
 
 function loadSyncStatus() {
+  // إذا الاشتراك منتهي، لا تحدث شريط المزامنة
+  if (SUB_EXP && new Date(SUB_EXP) < new Date()) {
+    var si = document.getElementById('syncInfo');
+    if (si) si.textContent = 'المزامنة متوقفة — انتهى الاشتراك';
+    return;
+  }
   fetch(API + '/sync-status' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
   .then(function(r) { return r.json(); })
   .then(function(d) {
@@ -1044,31 +1050,15 @@ function updateSubExpiry() {
   
   if (statusEl) statusEl.textContent = daysLeft < 0 ? 'منتهي' : 'نشط';
   if (expiryEl) expiryEl.textContent = dateStr;
-  
-  // شارة بجانب اسم المتجر (فقط ≤ 3 أيام)
-  if (badgeEl) {
-    if (daysLeft <= 3 && daysLeft >= 0) {
-      badgeEl.style.display = 'inline-block';
-      if (daysLeft === 0) {
-        badgeEl.textContent = '️';
-        badgeEl.style.background = '#ef4444';
-        badgeEl.title = 'اشتراكك ينتهي اليوم';
-      } else if (daysLeft === 1) {
-        badgeEl.textContent = '';
-        badgeEl.style.background = '#f97316';
-        badgeEl.title = 'يوم واحد متبقي';
-      } else if (daysLeft === 2) {
-        badgeEl.textContent = '️';
-        badgeEl.style.background = '#eab308';
-        badgeEl.title = 'يومان متبقيان';
-      } else {
-        badgeEl.textContent = '🔔';
-        badgeEl.style.background = '#eab308';
-        badgeEl.title = '3 أيام متبقية';
-      }
-    } else {
-      badgeEl.style.display = 'none';
-    }
+
+  // عند انتهاء الاشتراك: تغيير شريط المزامنة إلى "المزامنة متوقفة"
+  var syncInfo = document.getElementById('syncInfo');
+  var syncDot = document.querySelector('.sync-dot');
+  if (daysLeft < 0) {
+    if (syncInfo) syncInfo.textContent = 'المزامنة متوقفة — انتهى الاشتراك';
+    if (syncDot) syncDot.style.background = '#ef4444';
+  } else {
+    if (syncDot) syncDot.style.background = 'var(--green)';
   }
   
   // بطاقة البنر المنفصلة تحت شريط المزامنة

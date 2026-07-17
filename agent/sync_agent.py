@@ -993,9 +993,25 @@ def main() -> None:
             logger.error(str(e) or LOG["sub_expired"])
             # Check if subscription expired (410) vs suspended (403)
             if hasattr(e, 'status_code') and e.status_code == 410:
-                logger.error("Subscription expired - agent will retry once per hour")
-                # Sleep for 1 hour instead of 5 minutes
-                time.sleep(3600)
+                logger.error("Subscription expired - agent will retry 3 times per hour, then wait 24 hours")
+                # Try 3 times with 20 minute intervals
+                for attempt in range(3):
+                    time.sleep(1200)  # 20 minutes between attempts
+                    try:
+                        snap = snapshot_db(db_path)
+                        if snap:
+                            ensure_activated(cfg, api, snap)
+                            run_sync_cycle(cfg, api, snap)
+                            logger.info("Subscription renewed! Sync successful")
+                            break  # Exit retry loop if successful
+                    except SubscriptionError as retry_e:
+                        logger.error(f"Retry attempt {attempt + 1}/3 failed: {retry_e}")
+                    except Exception as retry_e:
+                        logger.error(f"Retry attempt {attempt + 1}/3 error: {retry_e}")
+                # After 3 failed attempts, sleep for 24 hours
+                logger.error("All retry attempts failed - sleeping for 24 hours")
+                time.sleep(86400)  # 24 hours
+                continue  # Skip the normal sleep at the end
             else:
                 time.sleep(300)
         except Exception as e:
