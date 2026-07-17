@@ -89,6 +89,7 @@ router = APIRouter(prefix="/api/portal")
 def _make_portal_token(tenant_id, tax, store, close_hour=0, onboarded=False, jwt_secret="", jwt_alg="HS256"):
     return jwt.encode({
         "sub": "portal",
+        "aud": "portal",
         "tenant_id": str(tenant_id),
         "tax": tax,
         "store": store,
@@ -103,7 +104,11 @@ async def _require_portal(authorization=None, jwt_secret="", jwt_alg=""):
         raise HTTPException(401, "Token missing")
     try:
         tok = authorization.replace("Bearer ", "")
-        payload = jwt.decode(tok, jwt_secret, algorithms=[jwt_alg], audience="portal")
+        # Decode without audience verification first
+        payload = jwt.decode(tok, jwt_secret, algorithms=[jwt_alg], options={"verify_aud": False})
+        # Verify audience if present (new tokens have it, legacy tokens don't)
+        if "aud" in payload and payload["aud"] != "portal":
+            raise HTTPException(401, "Invalid audience")
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Session expired")
     except jwt.InvalidTokenError:
