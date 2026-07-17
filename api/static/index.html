@@ -1426,14 +1426,11 @@ function renderScanTab() {
   var html = '<div style="max-width:600px;margin:0 auto">'
     + '<div class="card" style="padding:24px">'
     + '<h3 style="margin-bottom:16px;color:var(--text)">مسح فاتورة مشتريات</h3>'
-    + '<p style="color:var(--muted);font-size:13px;margin-bottom:20px">امسح رمز QR من فاتورة المشتريات لتسجيلها تلقائياً</p>'
+    + '<p style="color:var(--muted);font-size:13px;margin-bottom:20px">وجّه الكاميرا نحو رمز QR في فاتورة المشتريات</p>'
     
-    + '<div style="margin-bottom:20px">'
-    + '<label style="display:block;font-weight:600;margin-bottom:8px">رمز QR (Base64)</label>'
-    + '<textarea id="qrInput" rows="4" style="width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:12px;resize:vertical" placeholder="الصق رمز QR هنا..."></textarea>'
-    + '</div>'
+    + '<div id="qrScanner" style="width:100%;margin-bottom:20px;border-radius:12px;overflow:hidden;background:#000"></div>'
     
-    + '<button class="btn" onclick="decodeQR()" style="margin-bottom:16px">فك الرمز</button>'
+    + '<button class="btn" id="startScanBtn" onclick="startQRScan()" style="margin-bottom:16px">بدء المسح</button>'
     
     + '<div id="qrResult" style="display:none">'
     + '<div style="background:var(--bg);padding:16px;border-radius:8px;margin-bottom:16px">'
@@ -1452,7 +1449,7 @@ function renderScanTab() {
     
     + '<div style="display:flex;gap:12px">'
     + '<button class="btn" onclick="confirmQR()" style="flex:1;background:var(--success)">تأكيد التسجيل</button>'
-    + '<button class="btn" onclick="renderScanTab()" style="flex:1;background:var(--muted)">إلغاء</button>'
+    + '<button class="btn" onclick="resetScan()" style="flex:1;background:var(--muted)">مسح فاتورة أخرى</button>'
     + '</div>'
     + '</div>'
     + '</div>'
@@ -1462,27 +1459,76 @@ function renderScanTab() {
 }
 
 var currentQRData = null;
+var qrScanner = null;
 
-function decodeQR() {
-  var qrPayload = document.getElementById('qrInput').value.trim();
-  if (!qrPayload) {
-    alert('الرجاء إدخال رمز QR');
+function startQRScan() {
+  var btn = document.getElementById('startScanBtn');
+  btn.style.display = 'none';
+  
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('المتصفح لا يدعم الكاميرا. استخدم Chrome أو Firefox.');
+    btn.style.display = 'block';
     return;
   }
   
+  // Load html5-qrcode library dynamically
+  if (typeof Html5Qrcode === 'undefined') {
+    var script = document.createElement('script');
+    script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    script.onload = function() { initQRScanner(); };
+    script.onerror = function() {
+      alert('فشل تحميل مكتبة المسح. تحقق من اتصال الإنترنت.');
+      btn.style.display = 'block';
+    };
+    document.head.appendChild(script);
+  } else {
+    initQRScanner();
+  }
+}
+
+function initQRScanner() {
+  qrScanner = new Html5Qrcode("qrScanner");
+  
+  var config = {
+    fps: 10,
+    qrbox: { width: 250, height: 250 },
+    aspectRatio: 1.0
+  };
+  
+  qrScanner.start(
+    { facingMode: "environment" },
+    config,
+    onScanSuccess,
+    function(){} // ignore errors during scanning
+  ).catch(function(err) {
+    alert('فشل تشغيل الكاميرا: ' + err);
+    document.getElementById('startScanBtn').style.display = 'block';
+  });
+}
+
+function onScanSuccess(decodedText) {
+  // Stop scanner
+  if (qrScanner) {
+    qrScanner.stop().then(function() {
+      qrScanner.clear();
+    }).catch(function(){});
+  }
+  
+  // Decode the QR as ZATCA Base64 TLV
   fetch(API + '/purchase-qr/decode', {
     method: 'POST',
     headers: apiHeaders(),
-    body: JSON.stringify({ qr_payload: qrPayload })
+    body: JSON.stringify({ qr_payload: decodedText })
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
-    if (data.error) {
-      alert('خطأ: ' + data.error);
+    if (data.detail) {
+      alert('خطأ: ' + data.detail);
+      document.getElementById('startScanBtn').style.display = 'block';
       return;
     }
     
-    currentQRData = { payload: qrPayload, data: data };
+    currentQRData = { payload: decodedText, data: data };
     
     document.getElementById('qrSeller').textContent = data.seller_name;
     document.getElementById('qrTax').textContent = data.seller_tax_number;
@@ -1494,7 +1540,14 @@ function decodeQR() {
   })
   .catch(function(err) {
     alert('فشل فك الرمز: ' + err.message);
+    document.getElementById('startScanBtn').style.display = 'block';
   });
+}
+
+function resetScan() {
+  currentQRData = null;
+  document.getElementById('qrResult').style.display = 'none';
+  document.getElementById('startScanBtn').style.display = 'block';
 }
 
 function confirmQR() {

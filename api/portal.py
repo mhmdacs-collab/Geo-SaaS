@@ -301,12 +301,15 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
         """, tid, did, start, end)
 
         # Dashboard QR purchase invoices (merged with Aronium purchases)
-        qr_rows = await conn.fetch("""
-            SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt
-            FROM dashboard_purchase_invoice
-            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-              AND issued_at >= $3 AND issued_at < $4
-        """, tid, did, start, end)
+        try:
+            qr_rows = await conn.fetch("""
+                SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt
+                FROM dashboard_purchase_invoice
+                WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+                  AND issued_at >= $3 AND issued_at < $4
+            """, tid, did, start, end)
+        except Exception:
+            qr_rows = []
 
     sales = refund = purchases = stock_return = 0.0
     cnt_s = cnt_p = cnt_sr = 0
@@ -398,13 +401,16 @@ async def _period_data(pool, tid, did, period):
         """, tid, did)
 
         # Dashboard QR purchase invoices (merged with Aronium purchases)
-        qr_rows = await conn.fetch(f"""
-            SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt,
-                   COALESCE(SUM(vat_amount), 0) AS vat_total
-            FROM dashboard_purchase_invoice
-            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-              AND DATE_TRUNC('{trunc}', issued_at) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-        """, tid, did)
+        try:
+            qr_rows = await conn.fetch(f"""
+                SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt,
+                       COALESCE(SUM(vat_amount), 0) AS vat_total
+                FROM dashboard_purchase_invoice
+                WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+                  AND DATE_TRUNC('{trunc}', issued_at) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+            """, tid, did)
+        except Exception:
+            qr_rows = []
 
     sales = refund = purchases = stock_return = 0.0
     tax_s = tax_r = tax_p = 0.0
@@ -494,13 +500,16 @@ async def _period_data_for_dates(pool, tid, did, start_date, end_date):
         """, tid, did, start_date, end_date, [SALES, REFUND, PURCHASE])
 
         # Dashboard QR purchase invoices (merged with Aronium purchases)
-        qr_rows = await conn.fetch("""
-            SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt,
-                   COALESCE(SUM(vat_amount), 0) AS vat_total
-            FROM dashboard_purchase_invoice
-            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-              AND issued_at::date >= $3 AND issued_at::date <= $4
-        """, tid, did, start_date, end_date)
+        try:
+            qr_rows = await conn.fetch("""
+                SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt,
+                       COALESCE(SUM(vat_amount), 0) AS vat_total
+                FROM dashboard_purchase_invoice
+                WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+                  AND issued_at::date >= $3 AND issued_at::date <= $4
+            """, tid, did, start_date, end_date)
+        except Exception:
+            qr_rows = []
 
     sales = refund = purchases = stock_return = 0.0
     tax_s = tax_r = tax_p = 0.0
@@ -646,16 +655,19 @@ async def portal_quarter_details(request: Request, tenant_id: Optional[str] = No
         """, tid, did, q_start, q_end, [SALES, REFUND, PURCHASE])
 
         # Dashboard QR purchase invoices (merged with Aronium purchases)
-        qr_rows = await conn.fetch("""
-            SELECT DATE_TRUNC('month', issued_at::date) AS month,
-                   COALESCE(SUM(total_amount), 0) AS total,
-                   COALESCE(SUM(vat_amount), 0) AS vat_total
-            FROM dashboard_purchase_invoice
-            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-              AND issued_at::date >= $3 AND issued_at::date <= $4
-            GROUP BY month
-            ORDER BY month
-        """, tid, did, q_start, q_end)
+        try:
+            qr_rows = await conn.fetch("""
+                SELECT DATE_TRUNC('month', issued_at::date) AS month,
+                       COALESCE(SUM(total_amount), 0) AS total,
+                       COALESCE(SUM(vat_amount), 0) AS vat_total
+                FROM dashboard_purchase_invoice
+                WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+                  AND issued_at::date >= $3 AND issued_at::date <= $4
+                GROUP BY month
+                ORDER BY month
+            """, tid, did, q_start, q_end)
+        except Exception:
+            qr_rows = []
 
     monthly = {}
     for r in rows:
@@ -746,15 +758,18 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
         """, tid, did, start, end)
 
         # Dashboard QR purchase invoices (merged with recent operations)
-        qr_rows = await conn.fetch("""
-            SELECT id, seller_name, total_amount, vat_amount, issued_at, device_id,
-                   dev.branch_name
-            FROM dashboard_purchase_invoice dpi
-            LEFT JOIN devices dev ON dev.id = dpi.device_id
-            WHERE dpi.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dpi.device_id = $2::uuid)
-              AND dpi.issued_at >= $3 AND dpi.issued_at < $4
-            ORDER BY dpi.issued_at DESC
-        """, tid, did, start, end)
+        try:
+            qr_rows = await conn.fetch("""
+                SELECT id, seller_name, total_amount, vat_amount, issued_at, device_id,
+                       dev.branch_name
+                FROM dashboard_purchase_invoice dpi
+                LEFT JOIN devices dev ON dev.id = dpi.device_id
+                WHERE dpi.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dpi.device_id = $2::uuid)
+                  AND dpi.issued_at >= $3 AND dpi.issued_at < $4
+                ORDER BY dpi.issued_at DESC
+            """, tid, did, start, end)
+        except Exception:
+            qr_rows = []
 
     type_map = {SALES: "sale", REFUND: "refund", PURCHASE: "purchase", STOCK_RETURN: "stock_return"}
 
