@@ -751,7 +751,7 @@ def ensure_activated(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
                 # working again automatically once resolved) and stop this
                 # cycle before any sync call is made. Logged once by the
                 # outer SubscriptionError handler with the real reason.
-                raise SubscriptionError(_friendly_http_error(e)) from e
+                raise SubscriptionError(_friendly_http_error(e), code) from e
             else:
                 raise
 
@@ -903,13 +903,9 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
             snap.close()
     
     # Check day status for auto-close logic
-    # Query Neon (server) directly to check if ZReport was synced today
     try:
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        z_count = api._get(f"/api/v1/sync/zreport-today?date={today_str}")
-        closed_today = z_count.get("count", 0) > 0
         current_hour = datetime.now().hour
-        result = api.report_day_status(closed_today, current_hour)
+        result = api.report_day_status(False, current_hour)
         if result.get("auto_close"):
             logger.info("Day auto-closed by server (no ZReport synced)")
     except Exception as e:
