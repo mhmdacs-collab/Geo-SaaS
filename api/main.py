@@ -888,6 +888,16 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
         
         close_hour = int(tenant["close_hour"] or 0)
         
+        # Check if ZReport was synced today (from server database)
+        z_count = await conn.fetchval("""
+            SELECT COUNT(*) FROM zreport
+            WHERE tenant_id=$1::uuid AND device_id=$2::uuid
+            AND date_created >= CURRENT_DATE
+        """, ctx.tenant_id, ctx.device_id)
+        
+        # Override closed_today based on actual server data
+        closed_today = z_count > 0
+        
         # Check if should trigger auto-close notification
         should_notify = False
         if not closed_today and current_hour >= close_hour:

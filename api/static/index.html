@@ -448,8 +448,14 @@ button,input,select{font-family:inherit}
     </div>
 
     <div class="fg">
-      <label>الإغلاق الأوتوماتيكي (ساعة 0-23)</label>
-      <input type="number" id="setHour" min="0" max="23" value="0">
+      <label>الإغلاق الأوتوماتيكي</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="setHour" min="1" max="12" value="12" style="width:60px">
+        <select id="setAmpm" style="flex:1">
+          <option value="PM">مساءً</option>
+          <option value="AM">صباحاً</option>
+        </select>
+      </div>
       <p style="font-size:10px;color:var(--muted);margin-top:4px">
         في حال لم يتم إغلاق اليوم من البرنامج، سيتم إغلاقه تلقائياً عند هذه الساعة.
         <br>ننصح بتحديده بعد ساعة إلى ساعتين من موعد إغلاق المتجر الفعلي.
@@ -984,7 +990,11 @@ function expenseIcon() { return '<svg viewBox="0 0 24 24" fill="none" stroke="cu
 
 /* ── SETTINGS ── */
 function openSettings() {
-  document.getElementById('setHour').value = CLOSE_HOUR;
+  var hour24 = CLOSE_HOUR || 0;
+  var hour12 = hour24 % 12 || 12;
+  var ampm = hour24 < 12 ? 'AM' : 'PM';
+  document.getElementById('setHour').value = hour12;
+  document.getElementById('setAmpm').value = ampm;
   document.getElementById('pwStatus').textContent = HAS_CUSTOM_PW ? 'كلمة مرور مخصصة' : 'رقم الجوال';
   document.getElementById('pw1').value = '';
   document.getElementById('pw2').value = '';
@@ -995,15 +1005,19 @@ function openSettings() {
 
 function saveCloseHour() {
   var h = parseInt(document.getElementById('setHour').value);
-  if (isNaN(h) || h < 0 || h > 23) { alert('يرجى إدخال رقم صحيح بين 0 و 23'); return; }
+  var ampm = document.getElementById('setAmpm').value;
+  if (isNaN(h) || h < 1 || h > 12) { alert('يرجى إدخال رقم صحيح بين 1 و 12'); return; }
+  var hour24 = h;
+  if (ampm === 'PM' && h !== 12) hour24 = h + 12;
+  if (ampm === 'AM' && h === 12) hour24 = 0;
   fetch(API + '/settings/close-hour', {
     method: 'POST',
     headers: apiHeaders(),
-    body: JSON.stringify({close_hour: h})
+    body: JSON.stringify({close_hour: hour24})
   })
   .then(function(r) {
     if (!r.ok) throw new Error('fail');
-    CLOSE_HOUR = h;
+    CLOSE_HOUR = hour24;
     hideModal('settingsModal');
   })
   .catch(function() { alert('حدث خطأ في الحفظ'); });

@@ -903,18 +903,11 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
             snap.close()
     
     # Check day status for auto-close logic
-    # Check Aronium DB directly: was a ZReport created today?
+    # Query Neon (server) directly to check if ZReport was synced today
     try:
         today_str = datetime.now().strftime("%Y-%m-%d")
-        db_conn = sqlite3.connect(snap_path)
-        last_z = db_conn.execute(
-            '''SELECT DateCreated FROM ZReport 
-               WHERE DateCreated >= ? 
-               ORDER BY DateCreated DESC LIMIT 1''',
-            (today_str,)
-        ).fetchone()
-        db_conn.close()
-        closed_today = last_z is not None
+        z_count = api._get(f"/api/v1/sync/zreport-today?date={today_str}")
+        closed_today = z_count.get("count", 0) > 0
         current_hour = datetime.now().hour
         result = api.report_day_status(closed_today, current_hour)
         if result.get("auto_close"):
