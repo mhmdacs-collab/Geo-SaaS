@@ -525,6 +525,7 @@ var API = '/api/portal';
 /* ── HELPERS ── */
 function fmt(n) {
   if (n === null || n === undefined) return '—';
+  if (isNaN(n)) return '—';
   return Number(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
@@ -749,7 +750,7 @@ function renderDayData(d, recent) {
   html += '<div class="mgrid mgrid-3">'
     + metricCard('mc-p', 'إجمالي المشتريات', fmt(d.purchases), '', purchaseIcon())
     + metricCard('mc-r', 'مرتجع المشتريات', fmt(d.stock_return), '', returnIcon())
-    + metricCard('mc-n', 'صافي المشتريات', fmt(d.purchases - d.stock_return), '', netIcon())
+    + metricCard('mc-n', 'صافي المشتريات', fmt((d.purchases || 0) - (d.stock_return || 0)), '', netIcon())
     + '</div>';
 
   // 3. المصاريف والخزينة
@@ -822,7 +823,7 @@ function renderQuarterData(d) {
   // الأرقام
   html += '<div class="qc-numbers">'
     + '<div class="qc-row"><span class="qc-label">صافي المبيعات</span><span class="qc-val qc-sales">' + fmt(cur.net_sales) + ' ريال</span></div>'
-    + '<div class="qc-row"><span class="qc-label">صافي المشتريات</span><span class="qc-val qc-purchase">' + fmt(cur.purchases - (cur.stock_return || 0)) + ' ريال</span></div>'
+    + '<div class="qc-row"><span class="qc-label">صافي المشتريات</span><span class="qc-val qc-purchase">' + fmt((cur.purchases || 0) - (cur.stock_return || 0)) + ' ريال</span></div>'
     + '<div class="qc-row qc-total"><span class="qc-label">المستحق للهيئة</span><span class="qc-val qc-due">' + fmt(cur.vat_due) + ' ريال</span></div>'
     + '</div>';
 
@@ -854,7 +855,7 @@ function renderQuarterData(d) {
     }
     html += '<div class="qc-numbers">'
       + '<div class="qc-row"><span class="qc-label">صافي المبيعات</span><span class="qc-val qc-sales">' + fmt(prev.net_sales) + ' ريال</span></div>'
-      + '<div class="qc-row"><span class="qc-label">صافي المشتريات</span><span class="qc-val qc-purchase">' + fmt(prev.purchases - (prev.stock_return || 0)) + ' ريال</span></div>'
+      + '<div class="qc-row"><span class="qc-label">صافي المشتريات</span><span class="qc-val qc-purchase">' + fmt((prev.purchases || 0) - (prev.stock_return || 0)) + ' ريال</span></div>'
       + '<div class="qc-row qc-total"><span class="qc-label">المستحق للهيئة</span><span class="qc-val qc-due">' + fmt(prev.vat_due) + ' ريال</span></div>'
       + '</div>';
     html += '<div class="qc-footer">'
@@ -912,8 +913,8 @@ function renderRecentPanel(ops) {
     var badge = badgeMap[op.type] || {cls: 'rec-badge-p', txt: op.type};
     var dateStr = op.date ? new Date(op.date).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit'}) : '';
     html += '<div class="rec-item">'
-      + '<div><div class="rec-num">' + (op.number || '—') + '<span class="rec-badge ' + badge.cls + '">' + badge.txt + '</span></div>'
-      + '<div class="rec-date">' + dateStr + (op.branch_name ? ' • ' + op.branch_name : '') + '</div></div>'
+      + '<div><div class="rec-num">' + escapeHtml(op.number || '—') + '<span class="rec-badge ' + badge.cls + '">' + badge.txt + '</span></div>'
+      + '<div class="rec-date">' + dateStr + (op.branch_name ? ' • ' + escapeHtml(op.branch_name) : '') + '</div></div>'
       + '<div class="rec-amt">' + fmt(op.amount) + '</div>'
       + '</div>';
   }
@@ -957,7 +958,7 @@ function renderBranchComparePanel(bb) {
     var pct = max > 0 ? (bb[i].total / max * 100) : 0;
     var c = colors[i % colors.length];
     html += '<div class="cmp-row">'
-      + '<div class="cmp-label"><span>' + bb[i].branch_name + '</span><span>' + fmt(bb[i].total) + '</span></div>'
+      + '<div class="cmp-label"><span>' + escapeHtml(bb[i].branch_name) + '</span><span>' + fmt(bb[i].total) + '</span></div>'
       + '<div class="cmp-bar"><div class="cmp-fill" style="width:' + pct + '%;background:' + c + '"></div></div>'
       + '</div>';
   }
@@ -1093,13 +1094,13 @@ function doPrint(quarterType) {
     + '<div class="pr-head">'
     + logoSvg
     + '<div class="pr-title">'
-    + '<div class="pr-title-name">' + STORE + '</div>'
+    + '<div class="pr-title-name">' + escapeHtml(STORE) + '</div>'
     + '<div class="pr-title-sub">الإقرار الضريبي للقيمة المضافة</div>'
     + '</div>'
     + '<div class="pr-meta">'
-    + '<div class="pr-meta-row"><span class="pr-meta-label">الرقم الضريبي:</span><span class="pr-meta-val">' + TAX_NUM + '</span></div>'
-    + '<div class="pr-meta-row"><span class="pr-meta-label">معرف النظام:</span><span class="pr-meta-val">' + APP_ID + '</span></div>'
-    + '<div class="pr-meta-row"><span class="pr-meta-label">الفترة:</span><span class="pr-meta-val">' + periodLabel + '</span></div>'
+    + '<div class="pr-meta-row"><span class="pr-meta-label">الرقم الضريبي:</span><span class="pr-meta-val">' + escapeHtml(TAX_NUM) + '</span></div>'
+    + '<div class="pr-meta-row"><span class="pr-meta-label">معرف النظام:</span><span class="pr-meta-val">' + escapeHtml(APP_ID) + '</span></div>'
+    + '<div class="pr-meta-row"><span class="pr-meta-label">الفترة:</span><span class="pr-meta-val">' + escapeHtml(periodLabel) + '</span></div>'
     + '<div class="pr-meta-row"><span class="pr-meta-label">تاريخ التقرير:</span><span class="pr-meta-val">' + today + '</span></div>'
     + '</div>'
     + '</div>'

@@ -103,7 +103,7 @@ async def _require_portal(authorization=None, jwt_secret="", jwt_alg=""):
         raise HTTPException(401, "Token missing")
     try:
         tok = authorization.replace("Bearer ", "")
-        payload = jwt.decode(tok, jwt_secret, algorithms=[jwt_alg])
+        payload = jwt.decode(tok, jwt_secret, algorithms=[jwt_alg], audience="portal")
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Session expired")
     except jwt.InvalidTokenError:
