@@ -373,6 +373,7 @@ button,input,select{font-family:inherit}
       </div>
       <div class="hdr-info">
         <h1 id="hdrStore">—</h1>
+        <span id="subBadge" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;margin-right:8px;cursor:pointer" onclick="openSettings()"></span>
         <p id="hdrTax">—</p>
       </div>
     </div>
@@ -418,6 +419,7 @@ button,input,select{font-family:inherit}
     <div class="main">
       <div class="sync-bar">
         <div><span class="sync-dot"></span> <span id="syncInfo">—</span></div>
+        <div id="subBanner"></div>
         <button class="sync-btn" onclick="refreshData()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
           تحديث
@@ -485,6 +487,15 @@ button,input,select{font-family:inherit}
         تواصل مع الدعم الفني
       </button>
     </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+        حالة الاشتراك: <strong id="subStatus">—</strong>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
+        ينتهي في: <strong id="subExpiry">—</strong>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -501,7 +512,11 @@ button,input,select{font-family:inherit}
     </p>
     <div class="fg">
       <label>ساعة الإغلاق الأوتوماتيكي (0-23)</label>
-      <input type="number" id="onboardHour" min="0" max="23" value="2">
+      <input type="number" id="onboardHour" min="1" max="12" value="2">
+      <select id="onboardAmpm" style="flex:1;margin-top:8px">
+        <option value="AM">صباحاً</option>
+        <option value="PM" selected>مساءً</option>
+      </select>
     </div>
     <button type="button" class="btn" onclick="saveOnboard()">بدء الاستخدام</button>
   </div>
@@ -523,6 +538,7 @@ var CLOSE_HOUR = 0;
 var ONBOARDED = false;
 var SUPPORT_WA = '';
 var HAS_CUSTOM_PW = false;
+var SUB_EXP = null; // subscription expiry ISO string
 var lastQuarterData = null;
 var currentTab = 'today';
 
@@ -577,10 +593,12 @@ function doLogin() {
     ONBOARDED = !!d.onboarded;
     SUPPORT_WA = d.support_wa || '';
     HAS_CUSTOM_PW = !!d.has_custom_password;
+    SUB_EXP = d.sub_expires || null;
     BRANCHES = d.branches || [];
 
     document.getElementById('hdrStore').textContent = STORE;
     document.getElementById('hdrTax').textContent = 'الرقم الضريبي: ' + TAX_NUM;
+    updateSubExpiry();
 
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('appPage').style.display = 'block';
@@ -1000,7 +1018,82 @@ function openSettings() {
   document.getElementById('pw2').value = '';
   document.getElementById('pwErr').style.display = 'none';
   document.getElementById('pwSuc').style.display = 'none';
+  updateSubExpiry();
   showModal('settingsModal');
+}
+
+function updateSubExpiry() {
+  var bannerEl = document.getElementById('subBanner');
+  var badgeEl = document.getElementById('subBadge');
+  var statusEl = document.getElementById('subStatus');
+  var expiryEl = document.getElementById('subExpiry');
+  
+  if (!SUB_EXP) {
+    if (bannerEl) bannerEl.innerHTML = '';
+    if (badgeEl) badgeEl.style.display = 'none';
+    if (statusEl) statusEl.textContent = 'نشط';
+    if (expiryEl) expiryEl.textContent = '—';
+    return;
+  }
+  
+  var expDate = new Date(SUB_EXP);
+  var now = new Date();
+  var daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+  
+  var dateStr = expDate.toLocaleDateString('ar-SA', {year: 'numeric', month: 'long', day: 'numeric'});
+  
+  if (statusEl) statusEl.textContent = daysLeft < 0 ? 'منتهي' : 'نشط';
+  if (expiryEl) expiryEl.textContent = dateStr;
+  
+  // شارة بجانب اسم المتجر (فقط ≤ 3 أيام)
+  if (badgeEl) {
+    if (daysLeft <= 3 && daysLeft >= 0) {
+      badgeEl.style.display = 'inline-block';
+      if (daysLeft === 0) {
+        badgeEl.textContent = '️';
+        badgeEl.style.background = '#ef4444';
+        badgeEl.title = 'اشتراكك ينتهي اليوم';
+      } else if (daysLeft === 1) {
+        badgeEl.textContent = '';
+        badgeEl.style.background = '#f97316';
+        badgeEl.title = 'يوم واحد متبقي';
+      } else if (daysLeft === 2) {
+        badgeEl.textContent = '️';
+        badgeEl.style.background = '#eab308';
+        badgeEl.title = 'يومان متبقيان';
+      } else {
+        badgeEl.textContent = '🔔';
+        badgeEl.style.background = '#eab308';
+        badgeEl.title = '3 أيام متبقية';
+      }
+    } else {
+      badgeEl.style.display = 'none';
+    }
+  }
+  
+  // بنر بجانب آخر مزامنة
+  if (bannerEl) {
+    if (daysLeft <= 3 && daysLeft >= 0) {
+      var msg = '';
+      var color = '';
+      if (daysLeft === 3) {
+        msg = 'اشتراكك ينتهي خلال 3 أيام - يرجى التواصل لتجديده';
+        color = '#fef3c7';
+      } else if (daysLeft === 2) {
+        msg = '️ يومان متبقيان على انتهاء اشتراكك';
+        color = '#fed7aa';
+      } else if (daysLeft === 1) {
+        msg = '🔴 غدًا ينتهي اشتراكك - تواصل مع الدعم فوراً';
+        color = '#fecaca';
+      } else {
+        msg = '⛔ انتهى اشتراكك - تواصل مع الدعم لتجنب فقدان البيانات';
+        color = '#fca5a5';
+      }
+      bannerEl.innerHTML = '<div style="background:' + color + ';color:#1a1a1a;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;margin-top:4px" onclick="openSettings()">' + msg + '</div>';
+    } else {
+      bannerEl.innerHTML = '';
+    }
+  }
 }
 
 function saveCloseHour() {
@@ -1061,15 +1154,19 @@ function openSupport() {
 /* ── ONBOARD ── */
 function saveOnboard() {
   var h = parseInt(document.getElementById('onboardHour').value);
-  if (isNaN(h) || h < 0 || h > 23) { alert('يرجى إدخال رقم صحيح بين 0 و 23'); return; }
+  var ampm = document.getElementById('onboardAmpm').value;
+  if (isNaN(h) || h < 1 || h > 12) { alert('يرجى إدخال رقم صحيح بين 1 و 12'); return; }
+  var hour24 = h;
+  if (ampm === 'PM' && h !== 12) hour24 = h + 12;
+  if (ampm === 'AM' && h === 12) hour24 = 0;
   fetch(API + '/settings/close-hour', {
     method: 'POST',
     headers: apiHeaders(),
-    body: JSON.stringify({close_hour: h})
+    body: JSON.stringify({close_hour: hour24})
   })
   .then(function(r) {
     if (!r.ok) throw new Error('fail');
-    CLOSE_HOUR = h;
+    CLOSE_HOUR = hour24;
     ONBOARDED = true;
     hideModal('onboardModal');
   })

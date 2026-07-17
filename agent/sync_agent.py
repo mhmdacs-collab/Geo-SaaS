@@ -995,7 +995,13 @@ def main() -> None:
 
         except SubscriptionError as e:
             logger.error(str(e) or LOG["sub_expired"])
-            time.sleep(300)
+            # Check if subscription expired (410) vs suspended (403)
+            if hasattr(e, 'status_code') and e.status_code == 410:
+                logger.error("Subscription expired - agent will retry once per hour")
+                # Sleep for 1 hour instead of 5 minutes
+                time.sleep(3600)
+            else:
+                time.sleep(300)
         except Exception as e:
             logger.error(LOG["err_cycle"].format(reason=str(e)))
             

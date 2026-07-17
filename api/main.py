@@ -698,6 +698,32 @@ async def heartbeat(req: HeartbeatReq, ctx: AgentCtx = Depends(require_agent), r
             raise HTTPException(403, "Subscription not active")
         if tenant["expires_at"] and tenant["expires_at"] < datetime.now(timezone.utc):
             raise HTTPException(410, "Subscription expired")
+        
+        # Subscription expiry notification (3 days before)
+        if tenant["expires_at"]:
+            days_left = (tenant["expires_at"] - datetime.now(timezone.utc)).days
+            if days_left <= 3 and days_left >= 0:
+                # Check if we already sent notification for this expiry
+                already_sent = await conn.fetchval(
+                    """
+                    SELECT 1 FROM notifications
+                    WHERE tenant_id = $1
+                      AND device_id = $2
+                      AND notification_type = 'subscription_expiry'
+                      AND created_at >= NOW() - INTERVAL '24 hours'
+                    LIMIT 1
+                    """,
+                    ctx.tenant_id, ctx.device_id,
+                )
+                if not already_sent:
+                    msg = f"اشتراكك ينتهي خلال {days_left} يوم{'ين' if days_left == 2 else ''}. يرجى التواصل لتجديده."
+                    await conn.execute(
+                        """
+                        INSERT INTO notifications (tenant_id, device_id, notification_type, message)
+                        VALUES ($1, $2, 'subscription_expiry', $3)
+                        """,
+                        ctx.tenant_id, ctx.device_id, msg,
+                    )
 
         # Update device last seen
         await conn.execute(
