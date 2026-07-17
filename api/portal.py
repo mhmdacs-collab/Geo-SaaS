@@ -300,6 +300,14 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
             GROUP BY starting_cash_type
         """, tid, did, start, end)
 
+        # Dashboard QR purchase invoices (merged with Aronium purchases)
+        qr_rows = await conn.fetch("""
+            SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt
+            FROM dashboard_purchase_invoice
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND issued_at >= $3 AND issued_at < $4
+        """, tid, did, start, end)
+
     sales = refund = purchases = stock_return = 0.0
     cnt_s = cnt_p = cnt_sr = 0
     for r in rows:
@@ -309,6 +317,11 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
         elif dt == REFUND: refund = abs(t)
         elif dt == PURCHASE: purchases = t; cnt_p = r["cnt"]
         elif dt == STOCK_RETURN: stock_return = t; cnt_sr = r["cnt"]
+
+    # Add QR invoices to purchases
+    if qr_rows:
+        purchases += n(qr_rows[0]["total"])
+        cnt_p += int(qr_rows[0]["cnt"])
 
     treasury_in = treasury_out = 0.0
     for r in treasury_rows:
@@ -384,6 +397,15 @@ async def _period_data(pool, tid, did, period):
             GROUP BY starting_cash_type
         """, tid, did)
 
+        # Dashboard QR purchase invoices (merged with Aronium purchases)
+        qr_rows = await conn.fetch(f"""
+            SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt,
+                   COALESCE(SUM(vat_amount), 0) AS vat_total
+            FROM dashboard_purchase_invoice
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND DATE_TRUNC('{trunc}', issued_at) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+        """, tid, did)
+
     sales = refund = purchases = stock_return = 0.0
     tax_s = tax_r = tax_p = 0.0
     treasury_in = treasury_out = 0.0
@@ -402,6 +424,13 @@ async def _period_data(pool, tid, did, period):
         t = n(r["total"])
         if r["starting_cash_type"] == 0: treasury_in = t
         elif r["starting_cash_type"] == 1: treasury_out = t
+
+    # Add QR invoices to purchases and VAT
+    qr_purchase_count = 0
+    if qr_rows:
+        purchases += n(qr_rows[0]["total"])
+        tax_p += n(qr_rows[0]["vat_total"])
+        qr_purchase_count = int(qr_rows[0]["cnt"])
 
     q_label = ""; progress = days_remaining = 0
     if period == "quarter":
@@ -436,7 +465,7 @@ async def _period_data(pool, tid, did, period):
         "period_label": q_label if q_label else date.today().strftime("%B %Y"),
         "sales_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == SALES),
         "refund_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == REFUND),
-        "purchase_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == PURCHASE),
+        "purchase_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == PURCHASE) + qr_purchase_count,
         "stock_return_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == STOCK_RETURN),
     }
 
@@ -464,6 +493,15 @@ async def _period_data_for_dates(pool, tid, did, start_date, end_date):
             GROUP BY d.document_type_id
         """, tid, did, start_date, end_date, [SALES, REFUND, PURCHASE])
 
+        # Dashboard QR purchase invoices (merged with Aronium purchases)
+        qr_rows = await conn.fetch("""
+            SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt,
+                   COALESCE(SUM(vat_amount), 0) AS vat_total
+            FROM dashboard_purchase_invoice
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND issued_at::date >= $3 AND issued_at::date <= $4
+        """, tid, did, start_date, end_date)
+
     sales = refund = purchases = stock_return = 0.0
     tax_s = tax_r = tax_p = 0.0
     for r in rows:
@@ -478,6 +516,13 @@ async def _period_data_for_dates(pool, tid, did, start_date, end_date):
         elif dt == REFUND: tax_r = abs(t)
         elif dt == PURCHASE: tax_p = t
 
+    # Add QR invoices to purchases and VAT
+    qr_purchase_count = 0
+    if qr_rows:
+        purchases += n(qr_rows[0]["total"])
+        tax_p += n(qr_rows[0]["vat_total"])
+        qr_purchase_count = int(qr_rows[0]["cnt"])
+
     return {
         "sales": round(sales, 2), "refund": round(refund, 2),
         "net_sales": round(sales - refund, 2), "purchases": round(purchases, 2),
@@ -487,7 +532,7 @@ async def _period_data_for_dates(pool, tid, did, start_date, end_date):
         "vat_due": round((tax_s - tax_r) - tax_p, 2),
         "sales_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == SALES),
         "refund_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == REFUND),
-        "purchase_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == PURCHASE),
+        "purchase_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == PURCHASE) + qr_purchase_count,
         "stock_return_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == STOCK_RETURN),
     }
 
@@ -600,6 +645,18 @@ async def portal_quarter_details(request: Request, tenant_id: Optional[str] = No
             ORDER BY month
         """, tid, did, q_start, q_end, [SALES, REFUND, PURCHASE])
 
+        # Dashboard QR purchase invoices (merged with Aronium purchases)
+        qr_rows = await conn.fetch("""
+            SELECT DATE_TRUNC('month', issued_at::date) AS month,
+                   COALESCE(SUM(total_amount), 0) AS total,
+                   COALESCE(SUM(vat_amount), 0) AS vat_total
+            FROM dashboard_purchase_invoice
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
+              AND issued_at::date >= $3 AND issued_at::date <= $4
+            GROUP BY month
+            ORDER BY month
+        """, tid, did, q_start, q_end)
+
     monthly = {}
     for r in rows:
         m = r["month"].strftime("%Y-%m") if hasattr(r["month"], 'strftime') else str(r["month"])[:7]
@@ -610,6 +667,13 @@ async def portal_quarter_details(request: Request, tenant_id: Optional[str] = No
         elif dt == REFUND: monthly[m]["refund"] = abs(t)
         elif dt == PURCHASE: monthly[m]["purchases"] = t
 
+    # Merge QR invoices into monthly purchases
+    for r in qr_rows:
+        m = r["month"].strftime("%Y-%m") if hasattr(r["month"], 'strftime') else str(r["month"])[:7]
+        if m not in monthly:
+            monthly[m] = {"sales": 0, "refund": 0, "purchases": 0}
+        monthly[m]["purchases"] += n(r["total"])
+
     tax_by_month = {}
     for r in tax_rows:
         m = r["month"].strftime("%Y-%m") if hasattr(r["month"], 'strftime') else str(r["month"])[:7]
@@ -619,6 +683,13 @@ async def portal_quarter_details(request: Request, tenant_id: Optional[str] = No
         if dt == SALES: tax_by_month[m]["tax_sales"] = t
         elif dt == REFUND: tax_by_month[m]["tax_refund"] = abs(t)
         elif dt == PURCHASE: tax_by_month[m]["tax_purchases"] = t
+
+    # Merge QR VAT into tax_by_month
+    for r in qr_rows:
+        m = r["month"].strftime("%Y-%m") if hasattr(r["month"], 'strftime') else str(r["month"])[:7]
+        if m not in tax_by_month:
+            tax_by_month[m] = {"tax_sales": 0, "tax_refund": 0, "tax_purchases": 0}
+        tax_by_month[m]["tax_purchases"] += n(r["vat_total"])
 
     result = []
     for m in sorted(monthly.keys()):
@@ -674,6 +745,17 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
             ORDER BY sc.date_created DESC
         """, tid, did, start, end)
 
+        # Dashboard QR purchase invoices (merged with recent operations)
+        qr_rows = await conn.fetch("""
+            SELECT id, seller_name, total_amount, vat_amount, issued_at, device_id,
+                   dev.branch_name
+            FROM dashboard_purchase_invoice dpi
+            LEFT JOIN devices dev ON dev.id = dpi.device_id
+            WHERE dpi.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dpi.device_id = $2::uuid)
+              AND dpi.issued_at >= $3 AND dpi.issued_at < $4
+            ORDER BY dpi.issued_at DESC
+        """, tid, did, start, end)
+
     type_map = {SALES: "sale", REFUND: "refund", PURCHASE: "purchase", STOCK_RETURN: "stock_return"}
 
     operations = []
@@ -699,6 +781,18 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
             "number": "وارد خزينة" if r["starting_cash_type"] == 0 else "مصروف خزينة",
             "date": r["date_created"].isoformat() if r["date_created"] else "",
             "amount": round(n(r["amount"]), 2),
+            "branch_name": r["branch_name"] or "",
+            "payment_method": "",
+        })
+
+    # Add QR purchase invoices to recent operations
+    for r in qr_rows:
+        operations.append({
+            "id": str(r["id"]),
+            "type": "purchase",
+            "number": f"QR: {r['seller_name'][:20]}",
+            "date": r["issued_at"].isoformat() if r["issued_at"] else "",
+            "amount": round(n(r["total_amount"]), 2),
             "branch_name": r["branch_name"] or "",
             "payment_method": "",
         })

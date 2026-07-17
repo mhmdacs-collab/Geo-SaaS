@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>تجربة مسح فاتورة مشتريات</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#17202a;background:#f3f7fa}
+    body{margin:0;padding:24px}.card{max-width:620px;margin:auto;background:#fff;border:1px solid #dbe5eb;border-radius:18px;padding:22px;box-shadow:0 8px 25px #183b4d12}
+    h1{margin:0 0 8px;font-size:24px}.muted{color:#657681;font-size:14px}.reader{margin:20px 0;border:2px dashed #b9d5df;border-radius:14px;padding:10px;min-height:180px}
+    button{border:0;border-radius:10px;padding:12px 18px;background:#079fbd;color:white;font-size:15px;font-weight:700;cursor:pointer;margin:4px}
+    button.secondary{background:#e9f1f4;color:#23404d}button:disabled{opacity:.5;cursor:not-allowed}
+    .status{padding:12px;border-radius:10px;background:#f1f6f8;margin:12px 0}.error{background:#fff0f0;color:#a32929}.success{background:#edf9f1;color:#176b35}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.field{border:1px solid #e1eaee;border-radius:10px;padding:10px}.field small{display:block;color:#71828a;margin-bottom:4px}.field strong{word-break:break-word}
+    .wide{grid-column:1/-1}.disclaimer{background:#fff8e6;border-right:4px solid #e6a700;border-radius:8px;padding:12px;margin-top:18px;font-size:13px;line-height:1.7}
+    textarea{width:100%;min-height:90px;box-sizing:border-box;border:1px solid #ccdce2;border-radius:10px;padding:10px;font:inherit;margin-top:8px}
+    @media(max-width:500px){body{padding:12px}.card{padding:16px}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>مسح فاتورة مشتريات</h1>
+    <p class="muted">تجربة مستقلة لقراءة بيانات QR الخاصة بفواتير ZATCA.</p>
+    <div id="reader" class="reader"></div>
+    <button id="start">فتح الكاميرا</button>
+    <button id="stop" class="secondary" disabled>إيقاف الكاميرا</button>
+    <div id="status" class="status">لم تتم قراءة أي رمز بعد.</div>
+    <details>
+      <summary>إدخال النص يدوياً للاختبار</summary>
+      <textarea id="payload" placeholder="ألصق النص الناتج من قارئ QR هنا"></textarea>
+      <button id="decode" class="secondary">فك البيانات</button>
+    </details>
+    <section id="result" hidden>
+      <h2>البيانات المستخرجة</h2>
+      <div class="grid">
+        <div class="field"><small>اسم المورد</small><strong id="seller">—</strong></div>
+        <div class="field"><small>الرقم الضريبي</small><strong id="tax">—</strong></div>
+        <div class="field"><small>التاريخ والوقت</small><strong id="date">—</strong></div>
+        <div class="field"><small>الإجمالي شامل الضريبة</small><strong id="total">—</strong></div>
+        <div class="field"><small>ضريبة القيمة المضافة</small><strong id="vat">—</strong></div>
+        <div class="field wide"><small>النص الأصلي</small><strong id="raw">—</strong></div>
+      </div>
+      <div class="disclaimer">يتم عرض البيانات كما وردت في رمز QR فقط. راجع الفاتورة الأصلية قبل اعتمادها، وتتحمل مسؤولية صحة البيانات واستخدام الفاتورة.</div>
+      <button id="confirm" disabled>أوافق وأقوم بتسجيل الفاتورة</button>
+    </section>
+  </main>
+  <script>
+    let scanner, lastPayload = "";
+    const $ = id => document.getElementById(id);
+    const status = (text, kind = "") => { $("status").textContent = text; $("status").className = "status " + kind; };
+    function decodeBase64(value) {
+      const bytes = Uint8Array.from(atob(value.trim()), c => c.charCodeAt(0));
+      const fields = {}; let i = 0;
+      while (i < bytes.length) {
+        const tag = bytes[i++], length = bytes[i++], data = bytes.slice(i, i + length);
+        fields[tag] = new TextDecoder().decode(data); i += length;
+      }
+      return fields;
+    }
+    function showResult(payload) {
+      try {
+        const f = decodeBase64(payload);
+        const required = [1,2,3,4,5];
+        if (required.some(tag => !f[tag])) throw new Error("رمز QR لا يحتوي الحقول القياسية الخمسة");
+        lastPayload = payload;
+        $("seller").textContent = f[1]; $("tax").textContent = f[2];
+        $("date").textContent = new Date(f[3]).toLocaleString("en-GB");
+        $("total").textContent = f[4]; $("vat").textContent = f[5];
+        $("raw").textContent = payload; $("result").hidden = false; $("confirm").disabled = false;
+        status("تم استخراج بيانات QR بنجاح. راجعها قبل الاعتماد.", "success");
+      } catch (error) { status("تعذر قراءة QR: " + error.message, "error"); }
+    }
+    $("start").onclick = async () => {
+      try {
+        scanner = new Html5Qrcode("reader");
+        await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, showResult, () => {});
+        $("start").disabled = true; $("stop").disabled = false; status("وجّه الكاميرا إلى رمز QR.");
+      } catch (error) { status("تعذر فتح الكاميرا. استخدم HTTPS أو localhost وتأكد من صلاحية الكاميرا.", "error"); }
+    };
+    $("stop").onclick = async () => { if (scanner) await scanner.stop(); $("start").disabled = false; $("stop").disabled = true; };
+    $("decode").onclick = () => showResult($("payload").value);
+    $("confirm").onclick = () => { if (lastPayload) status("تم تأكيد البيانات تجريبياً فقط. لم يتم حفظ أي شيء.", "success"); };
+  </script>
+</body>
+</html>

@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import portal
+import purchase_qr
 
 # ────────────────────────────────────────────────────────────────────────────
 # Config
@@ -114,6 +115,7 @@ app.add_middleware(
     allow_methods=["GET", "POST"], allow_headers=["*"],
 )
 app.include_router(portal.router)
+app.include_router(purchase_qr.router)
 
 
 # ────────────────────────────────────────────────────────────────────────────
