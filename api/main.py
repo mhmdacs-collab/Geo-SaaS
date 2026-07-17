@@ -916,7 +916,7 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
         
         # Check if ZReport was synced today (from server database)
         z_count = await conn.fetchval("""
-            SELECT COUNT(*) FROM zreport
+            SELECT COUNT(*) FROM z_report
             WHERE tenant_id=$1::uuid AND device_id=$2::uuid
             AND date_created >= CURRENT_DATE
         """, ctx.tenant_id, ctx.device_id)
