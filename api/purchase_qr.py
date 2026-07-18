@@ -99,6 +99,22 @@ async def _get_portal_auth(request: Request):
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# Invoice Number Generator
+# ────────────────────────────────────────────────────────────────────────────
+async def _generate_invoice_number(tenant_id: str, conn) -> str:
+    """Generate unique invoice number in format PUR-QR-XXXXX for tenant."""
+    # Get the max number for this tenant
+    result = await conn.fetchval(r"""
+        SELECT MAX(CAST(SUBSTRING(invoice_number FROM 'PUR-QR-(\d+)') AS INT))
+        FROM dashboard_purchase_invoice
+        WHERE tenant_id = $1::uuid
+    """, tenant_id)
+    
+    next_num = (result or 0) + 1
+    return f"PUR-QR-{str(next_num).zfill(5)}"
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # Endpoints
 # ────────────────────────────────────────────────────────────────────────────
 @router.post("/purchase-qr/decode")
@@ -161,23 +177,27 @@ async def confirm_qr_invoice(body: QrConfirmReq, request: Request):
                 "message": "هذه الفاتورة مسجلة مسبقاً لهذا الفرع. هل تريد تسجيلها مرة أخرى؟",
             }
 
+        # Generate invoice number
+        invoice_number = await _generate_invoice_number(tenant_id, conn)
+        
         # Insert
         new_id = await conn.fetchval("""
             INSERT INTO dashboard_purchase_invoice
               (tenant_id, device_id, seller_name, seller_tax_number,
-               issued_at, total_amount, vat_amount, qr_payload, qr_payload_hash)
-            VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9)
+               issued_at, total_amount, vat_amount, qr_payload, qr_payload_hash, invoice_number)
+            VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id
         """, tenant_id, device_id, data["seller_name"], data["seller_tax_number"],
              data["issued_at"], data["total_amount"], data["vat_amount"],
-             body.qr_payload.strip(), qr_hash)
+             body.qr_payload.strip(), qr_hash, invoice_number)
 
-    log.info("QR invoice stored: tenant=%s device=%s seller=%s total=%s",
-             tenant_id, device_id, data["seller_name"], data["total_amount"])
+    log.info("QR invoice stored: tenant=%s device=%s seller=%s total=%s number=%s",
+             tenant_id, device_id, data["seller_name"], data["total_amount"], invoice_number)
 
     return {
         "duplicate": False,
         "id": str(new_id),
+        "invoice_number": invoice_number,
         "seller_name": data["seller_name"],
         "seller_tax_number": data["seller_tax_number"],
         "issued_at": data["issued_at"].isoformat(),
@@ -211,14 +231,17 @@ async def force_save_qr_invoice(body: QrConfirmReq, request: Request):
     qr_hash = hashlib.sha256(body.qr_payload.strip().encode("utf-8")).hexdigest()
 
     async with pool.acquire() as conn:
+        # Generate invoice number
+        invoice_number = await _generate_invoice_number(tenant_id, conn)
+        
         new_id = await conn.fetchval("""
             INSERT INTO dashboard_purchase_invoice
               (tenant_id, device_id, seller_name, seller_tax_number,
-               issued_at, total_amount, vat_amount, qr_payload, qr_payload_hash)
-            VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9)
+               issued_at, total_amount, vat_amount, qr_payload, qr_payload_hash, invoice_number)
+            VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id
         """, tenant_id, device_id, data["seller_name"], data["seller_tax_number"],
              data["issued_at"], data["total_amount"], data["vat_amount"],
-             body.qr_payload.strip(), qr_hash)
+             body.qr_payload.strip(), qr_hash, invoice_number)
 
-    return {"id": str(new_id), "saved": True}
+    return {"id": str(new_id), "invoice_number": invoice_number, "saved": True}

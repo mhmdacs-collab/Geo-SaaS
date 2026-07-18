@@ -765,6 +765,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
         try:
             qr_rows = await conn.fetch("""
                 SELECT id, seller_name, total_amount, vat_amount, issued_at, device_id,
+                       invoice_number,
                        dev.branch_name
                 FROM dashboard_purchase_invoice dpi
                 LEFT JOIN devices dev ON dev.id = dpi.device_id
@@ -810,7 +811,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
         operations.append({
             "id": str(r["id"]),
             "type": "purchase",
-            "number": f"QR: {r['seller_name'][:20]}",
+            "number": r["invoice_number"] or f"QR: {r['seller_name'][:20]}",
             "date": r["issued_at"].isoformat() if r["issued_at"] else "",
             "amount": round(n(r["total_amount"]), 2),
             "branch_name": r["branch_name"] or "",
