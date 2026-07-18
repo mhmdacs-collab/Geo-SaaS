@@ -1,4 +1,4 @@
-﻿"""
+"""
 Aronium SaaS - Portal API
 ==========================
 Merchant dashboard endpoints (read-only + settings).
@@ -444,8 +444,8 @@ async def _period_data(pool, tid, did, period):
     if period == "quarter":
         today = date.today()
         qm = ((today.month - 1) // 3) * 3 + 1
-        names = {1: "ط§ظ„ط£ظˆظ„", 4: "ط§ظ„ط«ط§ظ†ظٹ", 7: "ط§ظ„ط«ط§ظ„ط«", 10: "ط§ظ„ط±ط§ط¨ط¹"}
-        q_label = f"ط§ظ„ط±ط¨ط¹ {names.get(qm, 'ط§ظ„ط­ط§ظ„ظٹ')} {today.year}"
+        names = {1: "الأول", 4: "الثاني", 7: "الثالث", 10: "الرابع"}
+        q_label = f"الربع {names.get(qm, 'الحالي')} {today.year}"
         q_start = date(today.year, qm, 1)
         qem = qm + 2
         ld = 31 if qem in [1,3,5,7,8,10,12] else 30 if qem in [4,6,9,11] else 28
@@ -590,8 +590,8 @@ async def portal_quarter(request: Request, tenant_id: Optional[str] = None):
         prev_data = await _period_data_for_dates(pool, tid, did, prev_start, prev_end)
         
         # Quarter label
-        names = {1: "ط§ظ„ط£ظˆظ„", 4: "ط§ظ„ط«ط§ظ†ظٹ", 7: "ط§ظ„ط«ط§ظ„ط«", 10: "ط§ظ„ط±ط§ط¨ط¹"}
-        prev_label = f"ط§ظ„ط±ط¨ط¹ {names.get(prev_qm, 'ط§ظ„ط³ط§ط¨ظ‚')} {prev_year}"
+        names = {1: "الأول", 4: "الثاني", 7: "الثالث", 10: "الرابع"}
+        prev_label = f"الربع {names.get(prev_qm, 'السابق')} {prev_year}"
         prev_data["quarter_label"] = prev_label
         prev_data["quarter_start"] = prev_start.isoformat()
         prev_data["quarter_end"] = prev_end.isoformat()
@@ -655,7 +655,7 @@ async def portal_quarter_details(request: Request, tenant_id: Optional[str] = No
               AND d.document_type_id = ANY($5::text[])
             GROUP BY month, d.document_type_id
             ORDER BY month
-        """, tid, did, q_start, q_end, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+        """, tid, did, q_start, q_end, [SALES, REFUND, PURCHASE])
 
         # Dashboard QR purchase invoices (merged with Aronium purchases)
         try:
@@ -798,7 +798,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
         operations.append({
             "id": str(r["id"]),
             "type": "expense" if r["starting_cash_type"] == 1 else "income",
-            "number": "ظˆط§ط±ط¯ ط®ط²ظٹظ†ط©" if r["starting_cash_type"] == 0 else "ظ…طµط±ظˆظپ ط®ط²ظٹظ†ط©",
+            "number": "وارد خزينة" if r["starting_cash_type"] == 0 else "مصروف خزينة",
             "date": r["date_created"].isoformat() if r["date_created"] else "",
             "amount": round(n(r["amount"]), 2),
             "branch_name": r["branch_name"] or "",
@@ -959,6 +959,5 @@ async def mark_all_notifications_read(request: Request):
             "UPDATE notifications SET is_read = true WHERE tenant_id = $1::uuid AND is_read = false",
             tid
         )
-
+    
     return {"success": True}
-
