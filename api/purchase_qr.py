@@ -9,7 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 
 import asyncpg
@@ -94,8 +94,9 @@ class QrConfirmReq(BaseModel):
 # Auth helper (same as portal)
 # ────────────────────────────────────────────────────────────────────────────
 async def _get_portal_auth(request: Request):
-    from portal import _get_auth
-    return await _get_auth(request)
+    # Import at runtime to avoid circular import
+    import portal
+    return await portal._get_auth(request)
 
 
 # ────────────────────────────────────────────────────────────────────────────
