@@ -430,7 +430,7 @@ button,input,select{font-family:inherit}
         <button class="tab active" onclick="switchTab('today',this)">اليوم</button>
         <button class="tab" onclick="switchTab('yesterday',this)">أمس</button>
         <button class="tab" onclick="switchTab('month',this)">الشهر</button>
-        <button class="tab" onclick="switchTab('quarter',this)">الإقرار الضريبي</button>
+        <button class="tab" onclick="switchTab('quarter',this)">التقرير الشهري</button>
         <button class="tab" onclick="switchTab('scan',this)">مسح فاتورة مشتريات</button>
       </div>
 
@@ -890,26 +890,37 @@ function renderQuarterData(d) {
       var mNames = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
       periodStr = mNames[s.getMonth()] + ' - ' + mNames[e.getMonth()] + ' ' + s.getFullYear();
     }
-    html += '<div class="quarter-card quarter-previous">'
-      + '<div class="qc-header">'
-      + '<div class="qc-badge qc-done">منتهي ✓</div>'
-      + '<div class="qc-title">' + (prev.quarter_label || 'الربع السابق') + '</div>'
-      + '</div>';
-    if (periodStr) {
-      html += '<div class="qc-period">' + periodStr + '</div>';
+    
+    // Check if deadline has passed (31 days after quarter end)
+    var deadlinePassed = false;
+    if (prev.days_until_deadline !== undefined && prev.days_until_deadline <= 0) {
+      deadlinePassed = true;
     }
-    if (prev.days_until_deadline !== undefined) {
-      html += '<div class="qc-deadline">⏰ متبقي ' + prev.days_until_deadline + ' يوم للموعد النهائي</div>';
+    
+    // Only show if not submitted and deadline not passed
+    if (!deadlinePassed) {
+      html += '<div class="quarter-card quarter-previous">'
+        + '<div class="qc-header">'
+        + '<div class="qc-badge qc-done">منتهي ✓</div>'
+        + '<div class="qc-title">' + (prev.quarter_label || 'الربع السابق') + '</div>'
+        + '</div>';
+      if (periodStr) {
+        html += '<div class="qc-period">' + periodStr + '</div>';
+      }
+      if (prev.days_until_deadline !== undefined) {
+        html += '<div class="qc-deadline">⏰ متبقي ' + prev.days_until_deadline + ' يوم للموعد النهائي</div>';
+      }
+      html += '<div class="qc-numbers">'
+        + '<div class="qc-row"><span class="qc-label">صافي المبيعات</span><span class="qc-val qc-sales">' + fmt(prev.net_sales) + ' ريال</span></div>'
+        + '<div class="qc-row"><span class="qc-label">صافي المشتريات</span><span class="qc-val qc-purchase">' + fmt((prev.purchases || 0) - (prev.stock_return || 0)) + ' ريال</span></div>'
+        + '<div class="qc-row qc-total"><span class="qc-label">المستحق للهيئة</span><span class="qc-val qc-due">' + fmt(prev.vat_due) + ' ريال</span></div>'
+        + '</div>';
+      html += '<div class="qc-footer">'
+        + '<button class="btn-download btn-download-final" onclick="doPrint(\'previous\')">📥 تحميل التقرير النهائي</button>'
+        + '<button class="btn-download" onclick="markQuarterSubmitted(\'' + prev.quarter_label + '\')" style="background:#10b981;margin-right:8px">✓ تقديم الإقرار</button>'
+        + '</div>';
+      html += '</div>';
     }
-    html += '<div class="qc-numbers">'
-      + '<div class="qc-row"><span class="qc-label">صافي المبيعات</span><span class="qc-val qc-sales">' + fmt(prev.net_sales) + ' ريال</span></div>'
-      + '<div class="qc-row"><span class="qc-label">صافي المشتريات</span><span class="qc-val qc-purchase">' + fmt((prev.purchases || 0) - (prev.stock_return || 0)) + ' ريال</span></div>'
-      + '<div class="qc-row qc-total"><span class="qc-label">المستحق للهيئة</span><span class="qc-val qc-due">' + fmt(prev.vat_due) + ' ريال</span></div>'
-      + '</div>';
-    html += '<div class="qc-footer">'
-      + '<button class="btn-download btn-download-final" onclick="doPrint(\'previous\')">📥 تحميل التقرير النهائي</button>'
-      + '</div>';
-    html += '</div>';
   }
 
   // ── مقارنة الفروع ────────────────────────────────────────────
@@ -1191,6 +1202,26 @@ function saveOnboard() {
   .catch(function() { alert('حدث خطأ في الحفظ'); });
 }
 
+/* ── QUARTER SUBMISSION ── */
+function markQuarterSubmitted(quarterLabel) {
+  if (!confirm('هل أنت متأكد من تقديم الإقرار الضريبي للربع ' + quarterLabel + '؟')) return;
+  
+  // Save submission status in localStorage
+  var submittedQuarters = JSON.parse(localStorage.getItem('submittedQuarters') || '[]');
+  if (submittedQuarters.indexOf(quarterLabel) === -1) {
+    submittedQuarters.push(quarterLabel);
+    localStorage.setItem('submittedQuarters', JSON.stringify(submittedQuarters));
+  }
+  
+  alert('تم تسجيل تقديم الإقرار بنجاح');
+  loadQuarterTab(); // Reload to hide the card
+}
+
+function isQuarterSubmitted(quarterLabel) {
+  var submittedQuarters = JSON.parse(localStorage.getItem('submittedQuarters') || '[]');
+  return submittedQuarters.indexOf(quarterLabel) !== -1;
+}
+
 /* ── PRINT ── */
 function doPrint(quarterType) {
   if (!lastQuarterData) { alert('لا توجد بيانات ضريبية'); return; }
@@ -1459,13 +1490,34 @@ function renderScanTab() {
     + '</div>'
     
     + '<div id="qrResult" style="display:none">'
-    + '<div style="background:var(--bg);padding:16px;border-radius:8px;margin-bottom:16px">'
+    + '<div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);padding:20px;border-radius:12px;margin-bottom:16px;border:2px solid #10b981;box-shadow:0 4px 6px rgba(0,0,0,0.05)">'
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #d1fae5">'
+    + '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
+    + '<h3 style="margin:0;color:#065f46;font-size:18px;font-weight:600">تم استخراج بيانات الفاتورة بنجاح</h3>'
+    + '</div>'
     + '<div style="display:grid;gap:12px">'
-    + '<div><strong>اسم المورد:</strong> <span id="qrSeller"></span></div>'
-    + '<div><strong>الرقم الضريبي:</strong> <span id="qrTax"></span></div>'
-    + '<div><strong>تاريخ الفاتورة:</strong> <span id="qrDate"></span></div>'
-    + '<div><strong>الإجمالي:</strong> <span id="qrTotal"></span> ريال</div>'
-    + '<div><strong>الضريبة:</strong> <span id="qrVat"></span> ريال</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">'
+    + '<span style="color:#047857;font-weight:500;font-size:14px">اسم المورد:</span>'
+    + '<span id="qrSeller" style="color:#065f46;font-weight:600;font-size:15px"></span>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #d1fae5">'
+    + '<span style="color:#047857;font-weight:500;font-size:14px">الرقم الضريبي:</span>'
+    + '<span id="qrTax" style="color:#065f46;font-weight:600;font-size:15px;font-family:monospace"></span>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #d1fae5">'
+    + '<span style="color:#047857;font-weight:500;font-size:14px">تاريخ الفاتورة:</span>'
+    + '<span id="qrDate" style="color:#065f46;font-weight:600;font-size:15px"></span>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #d1fae5">'
+    + '<span style="color:#047857;font-weight:500;font-size:14px">الإجمالي:</span>'
+    + '<span id="qrTotal" style="color:#065f46;font-weight:700;font-size:16px"></span>
+    + '<span style="color:#047857;font-size:14px;margin-right:4px">ريال</span>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #d1fae5">'
+    + '<span style="color:#047857;font-weight:500;font-size:14px">الضريبة:</span>'
+    + '<span id="qrVat" style="color:#065f46;font-weight:700;font-size:16px"></span>
+    + '<span style="color:#047857;font-size:14px;margin-right:4px">ريال</span>'
+    + '</div>'
     + '</div>'
     + '</div>'
     

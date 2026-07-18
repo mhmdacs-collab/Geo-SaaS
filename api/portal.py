@@ -771,18 +771,18 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
         """, tid, did, start, end)
 
         # Dashboard QR purchase invoices (merged with recent operations)
+        # Get last 20 QR invoices regardless of date range
         try:
             qr_rows = await conn.fetch("""
                 SELECT id, seller_name, total_amount, vat_amount, issued_at, device_id,
                        invoice_number,
                        dev.branch_name
                 FROM dashboard_purchase_invoice dpi
-                LEFT JOIN devices dev ON dev.id = dpi.device_id
+                LEFT JOIN devices dev ON dpi.device_id = dev.id
                 WHERE dpi.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dpi.device_id = $2::uuid)
-                  AND issued_at >= $3
-                  AND issued_at < $4
                 ORDER BY dpi.issued_at DESC
-            """, tid, did, start, end)
+                LIMIT 20
+            """, tid, did)
         except Exception:
             qr_rows = []
 
