@@ -130,12 +130,26 @@ def _scope(auth, branch_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
 
 
 def _period_bounds(close_hour, offset=0):
-    now = datetime.now()
-    today = now.date()
-    current_close = datetime(today.year, today.month, today.day, close_hour, 0, 0)
-    if now < current_close:
-        current_close -= timedelta(days=1)
-    return current_close + timedelta(days=offset), current_close + timedelta(days=offset + 1)
+    saudi = timezone(timedelta(hours=3))
+    now_saudi = datetime.now(saudi)
+    close_saudi = datetime(now_saudi.year, now_saudi.month, now_saudi.day, close_hour, tzinfo=saudi)
+    if now_saudi < close_saudi:
+        close_saudi -= timedelta(days=1)
+    close_utc = close_saudi.astimezone(timezone.utc)
+    return close_utc + timedelta(days=offset), close_utc + timedelta(days=offset + 1)
+    now_utc = datetime.now(timezone.utc)
+    now_saudi = now_utc.astimezone(timezone(timedelta(hours=3)))
+    close_saudi = datetime(
+        now_saudi.year,
+        now_saudi.month,
+        now_saudi.day,
+        close_hour,
+        tzinfo=timezone(timedelta(hours=3)),
+    )
+    if now_saudi < close_saudi:
+        close_saudi -= timedelta(days=1)
+    close_utc = close_saudi.astimezone(timezone.utc)
+    return close_utc + timedelta(days=offset), close_utc + timedelta(days=offset + 1)
 
 
 async def _get_auth(request):
@@ -306,7 +320,7 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
                 SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt
                 FROM dashboard_purchase_invoice
                 WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-                  AND issued_at >= $3 AND issued_at < $4
+                  AND issued_at::timestamp >= $3 AND issued_at::timestamp < $4
             """, tid, did, start, end)
         except Exception:
             qr_rows = []
@@ -506,7 +520,7 @@ async def _period_data_for_dates(pool, tid, did, start_date, end_date):
                        COALESCE(SUM(vat_amount), 0) AS vat_total
                 FROM dashboard_purchase_invoice
                 WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-                  AND issued_at::date >= $3 AND issued_at::date <= $4
+                  AND issued_at::timestamp >= $3 AND issued_at::timestamp <= $4
             """, tid, did, start_date, end_date)
         except Exception:
             qr_rows = []
@@ -662,7 +676,8 @@ async def portal_quarter_details(request: Request, tenant_id: Optional[str] = No
                        COALESCE(SUM(vat_amount), 0) AS vat_total
                 FROM dashboard_purchase_invoice
                 WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-                  AND issued_at::date >= $3 AND issued_at::date <= $4
+                  AND issued_at::date >= $3 
+                  AND issued_at::date <= $4
                 GROUP BY month
                 ORDER BY month
             """, tid, did, q_start, q_end)
@@ -765,7 +780,8 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
                 FROM dashboard_purchase_invoice dpi
                 LEFT JOIN devices dev ON dev.id = dpi.device_id
                 WHERE dpi.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dpi.device_id = $2::uuid)
-                  AND dpi.issued_at >= $3 AND dpi.issued_at < $4
+                  AND issued_at::timestamp >= $3 
+                  AND issued_at::timestamp < $4
                 ORDER BY dpi.issued_at DESC
             """, tid, did, start, end)
         except Exception:

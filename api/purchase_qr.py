@@ -61,10 +61,10 @@ def decode_zatca_qr(qr_payload: str) -> Dict[str, Any]:
 
     try:
         issued_at = datetime.fromisoformat(result[3])
-        # ZATCA QR timestamp is in Saudi time (UTC+3), convert to UTC for DB storage
-        # Assume naive datetime is Saudi time
+        # ZATCA QR timestamps without an offset are Saudi time.
         if issued_at.tzinfo is None:
-            issued_at = issued_at - timedelta(hours=3)  # Convert Saudi to UTC
+            issued_at = issued_at.replace(tzinfo=timezone(timedelta(hours=3)))
+        issued_at = issued_at.astimezone(timezone.utc)
     except ValueError:
         raise ValueError("QR غير صالح - التاريخ غير صحيح")
 
@@ -144,24 +144,21 @@ async def confirm_qr_invoice(body: QrConfirmReq, request: Request):
 
     qr_hash = hashlib.sha256(body.qr_payload.strip().encode("utf-8")).hexdigest()
 
-    # Duplicate check: same tax number + issued_at + total + vat
+    # Duplicate check: same QR payload hash (exact match)
     async with pool.acquire() as conn:
         existing = await conn.fetchrow("""
             SELECT id, created_at FROM dashboard_purchase_invoice
             WHERE tenant_id = $1::uuid
-              AND seller_tax_number = $2
-              AND issued_at = $3
-              AND total_amount = $4
-              AND vat_amount = $5
+              AND device_id = $2::uuid
+              AND qr_payload_hash = $3
             LIMIT 1
-        """, tenant_id, data["seller_tax_number"], data["issued_at"],
-             data["total_amount"], data["vat_amount"])
+        """, tenant_id, device_id, qr_hash)
 
         if existing:
             return {
                 "duplicate": True,
                 "existing_id": str(existing["id"]),
-                "message": "يوجد فاتورة مشابهة مسجلة مسبقاً. هل تريد التسجيل على أي حال؟",
+                "message": "هذه الفاتورة مسجلة مسبقاً لهذا الفرع. هل تريد تسجيلها مرة أخرى؟",
             }
 
         # Insert
