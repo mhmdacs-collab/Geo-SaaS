@@ -130,12 +130,17 @@ def _scope(auth, branch_id: Optional[str] = None) -> Tuple[str, Optional[str]]:
 
 
 def _period_bounds(close_hour, offset=0):
-    now = datetime.now()
-    today = now.date()
-    current_close = datetime(today.year, today.month, today.day, close_hour, 0, 0)
-    if now < current_close:
-        current_close -= timedelta(days=1)
-    return current_close + timedelta(days=offset), current_close + timedelta(days=offset + 1)
+    # close_hour is in Saudi time (UTC+3), convert to UTC for DB comparison
+    SAUDI_OFFSET = 3  # hours ahead of UTC
+    now_utc = datetime.now(timezone.utc)
+    now_saudi = now_utc + timedelta(hours=SAUDI_OFFSET)
+    today_saudi = now_saudi.date()
+    current_close_saudi = datetime(today_saudi.year, today_saudi.month, today_saudi.day, close_hour, 0, 0)
+    if now_saudi < current_close_saudi:
+        current_close_saudi -= timedelta(days=1)
+    # Convert to UTC (naive) for DB comparison
+    current_close_utc = current_close_saudi - timedelta(hours=SAUDI_OFFSET)
+    return current_close_utc + timedelta(days=offset), current_close_utc + timedelta(days=offset + 1)
 
 
 async def _get_auth(request):
