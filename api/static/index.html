@@ -776,7 +776,7 @@ function loadSyncStatus() {
     var dateStr = '—';
     if (d.last_doc_date) {
       var dt = new Date(d.last_doc_date);
-      dateStr = dt.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: 'numeric'}) + ' ' + dt.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'});
+      dateStr = dt.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Riyadh'}) + ' ' + dt.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh'});
     }
     document.getElementById('syncInfo').textContent = 'آخر مزامنة: ' + dateStr;
   })
