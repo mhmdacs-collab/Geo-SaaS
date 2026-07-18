@@ -151,11 +151,18 @@ def _to_datetime(v: Any) -> Optional[datetime]:
     for fmt in _TS_FORMATS:
         try:
             dt = datetime.strptime(s, fmt)
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            if dt.tzinfo:
+                return dt
+            saudi = timezone(timedelta(hours=3))
+            return dt.replace(tzinfo=saudi).astimezone(timezone.utc)
         except ValueError:
             continue
     try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo:
+            return dt
+        saudi = timezone(timedelta(hours=3))
+        return dt.replace(tzinfo=saudi).astimezone(timezone.utc)
     except ValueError:
         return None
 
@@ -810,20 +817,39 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
         )
 
     try:
+        new_z_numbers = []
         async with pool.acquire() as conn:
             async with conn.transaction():
                 rows_to_write = []
                 for raw in req.rows:
                     values = list(_coerce_row(pg_cols, project_row(tdef, raw), pg_table))
                     rows_to_write.append((ctx.tenant_id, ctx.device_id, *values))
+
+                if req.table.lower() == "zreport":
+                    z_ids = [row[2] for row in rows_to_write if row[2] is not None]
+                    if z_ids:
+                        existing_z_ids = await conn.fetch(
+                            """
+                            SELECT id
+                            FROM z_report
+                            WHERE tenant_id=$1::uuid
+                              AND device_id=$2::uuid
+                              AND id = ANY($3::text[])
+                            """,
+                            ctx.tenant_id, ctx.device_id, z_ids,
+                        )
+                        existing_ids = {str(row["id"]) for row in existing_z_ids}
+                        new_z_numbers = [
+                            row[3] for row in rows_to_write
+                            if row[2] is not None and str(row[2]) not in existing_ids
+                        ]
                 await conn.executemany(sql, rows_to_write)
         
         # Send notification for ZReport (daily close)
-        if req.table.lower() == "zreport" and rows_to_write:
+        if req.table.lower() == "zreport" and new_z_numbers:
             try:
                 async with pool.acquire() as conn:
-                    for row in rows_to_write:
-                        z_number = row[4]  # Number is at index 4 after tenant_id, device_id, Id
+                    for z_number in new_z_numbers:
                         await conn.execute(
                             """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
                                VALUES ($1::uuid, $2::uuid, 'daily_close', $3)""",
@@ -916,10 +942,12 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
 
     async with pool.acquire() as conn:
         tenant = await conn.fetchrow(
-            "SELECT close_hour FROM tenants WHERE id=$1::uuid",
+            "SELECT close_hour, COALESCE(onboarded, false) AS onboarded FROM tenants WHERE id=$1::uuid",
             ctx.tenant_id,
         )
         if not tenant:
+            return {"auto_close": False}
+        if not tenant["onboarded"]:
             return {"auto_close": False}
 
         close_hour = int(tenant["close_hour"] or 0)
