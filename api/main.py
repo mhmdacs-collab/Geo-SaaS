@@ -902,61 +902,93 @@ async def agent_send_notification(req: dict, ctx: AgentCtx = Depends(require_age
 
 @app.post("/api/v1/agents/day-status")
 async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
-    """Agent reports day status for auto-close logic.
-    
-    Agent sends: closed_today (bool), current_hour (int)
-    Server checks: if not closed and current_hour >= close_hour → auto-close notification
-    The close_hour is set by the tenant themselves (recommended 1-2 hours after actual close).
+    """Agent polls for auto-close status.
+
+    Server decides based on ACTUAL Saudi time (not agent's current_hour):
+      - Determine the current business day window using tenant's close_hour.
+      - If we are PAST today's close_hour AND no ZReport was synced within
+        the current business day window → trigger auto-close notification.
+      - If a ZReport exists (manual close from Aronium) → skip auto-close.
+
+    The message sent matches the portal's notification text exactly.
     """
     pool: asyncpg.Pool = app.state.pool
-    closed_today = req.get("closed_today", False)
-    current_hour = int(req.get("current_hour", 0))
-    
+
     async with pool.acquire() as conn:
-        # Get tenant's close_hour
         tenant = await conn.fetchrow(
             "SELECT close_hour FROM tenants WHERE id=$1::uuid",
-            ctx.tenant_id
+            ctx.tenant_id,
         )
         if not tenant:
             return {"auto_close": False}
-        
+
         close_hour = int(tenant["close_hour"] or 0)
-        
-        # Check if ZReport was synced today (from server database)
-        z_count = await conn.fetchval("""
+
+        # Compute current business-day window in Saudi time
+        saudi = timezone(timedelta(hours=3))
+        now_saudi = datetime.now(saudi)
+        today_close_saudi = datetime(
+            now_saudi.year, now_saudi.month, now_saudi.day,
+            close_hour, tzinfo=saudi,
+        )
+        if now_saudi < today_close_saudi:
+            # Business day started yesterday; window = [yesterday_close, today_close)
+            window_start_saudi = today_close_saudi - timedelta(days=1)
+            window_end_saudi = today_close_saudi
+        else:
+            # Business day started today; window = [today_close, tomorrow_close)
+            window_start_saudi = today_close_saudi
+            window_end_saudi = today_close_saudi + timedelta(days=1)
+
+        # Auto-close is only relevant AFTER the close_hour has passed
+        auto_close_eligible = now_saudi >= today_close_saudi
+
+        if not auto_close_eligible:
+            return {"auto_close": False}
+
+        window_start_utc = window_start_saudi.astimezone(timezone.utc)
+        window_end_utc = window_end_saudi.astimezone(timezone.utc)
+
+        # Check for manual ZReport within the current business day window
+        z_count = await conn.fetchval(
+            """
             SELECT COUNT(*) FROM z_report
-            WHERE tenant_id=$1::uuid AND device_id=$2::uuid
-            AND date_created >= CURRENT_DATE
-        """, ctx.tenant_id, ctx.device_id)
-        
-        # Override closed_today based on actual server data
-        closed_today = z_count > 0
-        
-        # Check if should trigger auto-close notification
-        should_notify = False
-        if not closed_today and current_hour >= close_hour:
-            should_notify = True
-        
-        if should_notify:
-            # Check if we already sent auto-close notification today (avoid spam)
-            existing = await conn.fetchval("""
-                SELECT COUNT(*) FROM notifications
-                WHERE tenant_id=$1::uuid AND device_id=$2::uuid
-                AND notification_type='auto_close'
-                AND created_at >= CURRENT_DATE
-            """, ctx.tenant_id, ctx.device_id)
-            
-            if existing == 0:
-                await conn.execute(
-                    """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
-                       VALUES ($1::uuid, $2::uuid, 'auto_close', $3)""",
-                    ctx.tenant_id, ctx.device_id,
-                    "لم يتم إغلاق اليوم - تم الإغلاق الأوتوماتيكي"
-                )
-                return {"auto_close": True}
-        
-        return {"auto_close": False}
+            WHERE tenant_id=$1::uuid
+              AND device_id=$2::uuid
+              AND date_created >= $3::timestamptz
+              AND date_created <  $4::timestamptz
+            """,
+            ctx.tenant_id, ctx.device_id, window_start_utc, window_end_utc,
+        )
+
+        if z_count and z_count > 0:
+            # Manual close already happened for this business day
+            return {"auto_close": False}
+
+        # Avoid spamming: at most one auto-close notification per business day
+        existing = await conn.fetchval(
+            """
+            SELECT COUNT(*) FROM notifications
+            WHERE tenant_id=$1::uuid
+              AND device_id=$2::uuid
+              AND notification_type='auto_close'
+              AND created_at >= $3::timestamptz
+              AND created_at <  $4::timestamptz
+            """,
+            ctx.tenant_id, ctx.device_id, window_start_utc, window_end_utc,
+        )
+        if existing and existing > 0:
+            return {"auto_close": False}
+
+        # Insert auto-close notification (matches portal wording exactly)
+        await conn.execute(
+            """INSERT INTO notifications
+               (tenant_id, device_id, notification_type, message)
+               VALUES ($1::uuid, $2::uuid, 'auto_close', $3)""",
+            ctx.tenant_id, ctx.device_id,
+            "تم إنهاء اليوم من لوحة التحكم بشكل أوتوماتيكي وبداية يوم جديد",
+        )
+        return {"auto_close": True}
 
 
 # ────────────────────────────────────────────────────────────────────────────
