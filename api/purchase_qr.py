@@ -64,7 +64,6 @@ def decode_zatca_qr(qr_payload: str) -> Dict[str, Any]:
         # ZATCA QR timestamp is in Saudi time (UTC+3), convert to UTC for DB storage
         # Assume naive datetime is Saudi time
         if issued_at.tzinfo is None:
-            from datetime import timedelta
             issued_at = issued_at - timedelta(hours=3)  # Convert Saudi to UTC
     except ValueError:
         raise ValueError("QR غير صالح - التاريخ غير صحيح")
