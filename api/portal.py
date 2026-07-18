@@ -25,6 +25,7 @@ import hashlib
 import bcrypt
 
 log = logging.getLogger("ingest")
+SAUDI_TZ = timezone(timedelta(hours=3))
 
 SALES = "2"
 REFUND = "4"
@@ -81,6 +82,14 @@ def to_d(row):
         elif v is not None and not isinstance(v, (int, float, bool, str, list, dict)):
             d[k] = str(v)
     return d
+
+
+def _saudi_iso(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(SAUDI_TZ).isoformat()
 
 
 router = APIRouter(prefix="/api/portal")
@@ -785,7 +794,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
             "id": str(r["id"]),
             "type": type_map.get(r["document_type_id"], "sale"),
             "number": r["number"] or "",
-            "date": r["date_created"].isoformat() if r["date_created"] else "",
+            "date": _saudi_iso(r["date_created"]) or "",
             "amount": round(n(r["total"]), 2),
             "branch_name": r["branch_name"] or "",
             "payment_method": r["payment_method"] or "" if r["document_type_id"] == SALES else "",
@@ -800,7 +809,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
             "id": str(r["id"]),
             "type": "expense" if r["starting_cash_type"] == 1 else "income",
             "number": "وارد خزينة" if r["starting_cash_type"] == 0 else "مصروف خزينة",
-            "date": r["date_created"].isoformat() if r["date_created"] else "",
+            "date": _saudi_iso(r["date_created"]) or "",
             "amount": round(n(r["amount"]), 2),
             "branch_name": r["branch_name"] or "",
             "payment_method": "",
@@ -812,7 +821,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
             "id": str(r["id"]),
             "type": "purchase",
             "number": r["invoice_number"] or f"QR: {r['seller_name'][:20]}",
-            "date": r["issued_at"].isoformat() if r["issued_at"] else "",
+            "date": _saudi_iso(r["issued_at"]) or "",
             "amount": round(n(r["total_amount"]), 2),
             "branch_name": r["branch_name"] or "",
             "payment_method": "",
@@ -844,12 +853,12 @@ async def portal_sync_status(request: Request, tenant_id: Optional[str] = None):
         """, tid, did)
     last = row["last_doc_date"]
     return {
-        "last_doc_date": last.isoformat() if last else None,
+        "last_doc_date": _saudi_iso(last),
         "total_invoices": row["total_invoices"] or 0,
         "devices": [{
             "device_id": str(d["device_id"]), "branch_name": d["branch_name"],
             "is_active": d["is_active"],
-            "last_seen": d["last_seen"].isoformat() if d["last_seen"] else None,
+            "last_seen": _saudi_iso(d["last_seen"]),
         } for d in devices],
     }
 
