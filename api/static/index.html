@@ -897,8 +897,11 @@ function renderQuarterData(d) {
       deadlinePassed = true;
     }
     
+    // Check if already submitted
+    var alreadySubmitted = isQuarterSubmitted(prev.quarter_label || 'الربع السابق');
+    
     // Only show if not submitted and deadline not passed
-    if (!deadlinePassed) {
+    if (!deadlinePassed && !alreadySubmitted) {
       html += '<div class="quarter-card quarter-previous">'
         + '<div class="qc-header">'
         + '<div class="qc-badge qc-done">منتهي ✓</div>'
@@ -917,7 +920,7 @@ function renderQuarterData(d) {
         + '</div>';
       html += '<div class="qc-footer">'
         + '<button class="btn-download btn-download-final" onclick="doPrint(\'previous\')">📥 تحميل التقرير النهائي</button>'
-        + '<button class="btn-download" onclick="markQuarterSubmitted(\'' + prev.quarter_label + '\')" style="background:#10b981;margin-right:8px">✓ تقديم الإقرار</button>'
+        + '<button class="btn-download" onclick="markQuarterSubmitted(\'' + (prev.quarter_label || 'الربع السابق') + '\')" style="background:#10b981;margin-right:8px">✓ تقديم الإقرار</button>'
         + '</div>';
       html += '</div>';
     }
