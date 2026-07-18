@@ -1,4 +1,4 @@
-"""
+﻿"""
 Aronium SaaS - Portal API
 ==========================
 Merchant dashboard endpoints (read-only + settings).
@@ -133,19 +133,6 @@ def _period_bounds(close_hour, offset=0):
     saudi = timezone(timedelta(hours=3))
     now_saudi = datetime.now(saudi)
     close_saudi = datetime(now_saudi.year, now_saudi.month, now_saudi.day, close_hour, tzinfo=saudi)
-    if now_saudi < close_saudi:
-        close_saudi -= timedelta(days=1)
-    close_utc = close_saudi.astimezone(timezone.utc)
-    return close_utc + timedelta(days=offset), close_utc + timedelta(days=offset + 1)
-    now_utc = datetime.now(timezone.utc)
-    now_saudi = now_utc.astimezone(timezone(timedelta(hours=3)))
-    close_saudi = datetime(
-        now_saudi.year,
-        now_saudi.month,
-        now_saudi.day,
-        close_hour,
-        tzinfo=timezone(timedelta(hours=3)),
-    )
     if now_saudi < close_saudi:
         close_saudi -= timedelta(days=1)
     close_utc = close_saudi.astimezone(timezone.utc)
@@ -320,7 +307,7 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
                 SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS cnt
                 FROM dashboard_purchase_invoice
                 WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-                  AND issued_at::timestamp >= $3 AND issued_at::timestamp < $4
+                  AND issued_at >= $3 AND issued_at < $4
             """, tid, did, start, end)
         except Exception:
             qr_rows = []
@@ -381,7 +368,7 @@ async def _period_data(pool, tid, did, period):
               AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
               AND d.document_type_id = ANY($3::text[])
             GROUP BY d.document_type_id
-        """, tid, did, [SALES, REFUND, PURCHASE])
+        """, tid, did, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
         pay_rows = await conn.fetch(f"""
             SELECT pt.name AS pay_name, COALESCE(SUM(p.amount), 0) AS total
@@ -421,7 +408,7 @@ async def _period_data(pool, tid, did, period):
                        COALESCE(SUM(vat_amount), 0) AS vat_total
                 FROM dashboard_purchase_invoice
                 WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-                  AND DATE_TRUNC('{trunc}', issued_at) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+                  AND DATE_TRUNC('{trunc}', issued_at::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
             """, tid, did)
         except Exception:
             qr_rows = []
@@ -440,6 +427,7 @@ async def _period_data(pool, tid, did, period):
         if dt == SALES: tax_s = t
         elif dt == REFUND: tax_r = abs(t)
         elif dt == PURCHASE: tax_p = t
+        elif dt == STOCK_RETURN: tax_p -= abs(t)
     for r in treasury_rows:
         t = n(r["total"])
         if r["starting_cash_type"] == 0: treasury_in = t
@@ -456,8 +444,8 @@ async def _period_data(pool, tid, did, period):
     if period == "quarter":
         today = date.today()
         qm = ((today.month - 1) // 3) * 3 + 1
-        names = {1: "الأول", 4: "الثاني", 7: "الثالث", 10: "الرابع"}
-        q_label = f"الربع {names.get(qm, 'الحالي')} {today.year}"
+        names = {1: "ط§ظ„ط£ظˆظ„", 4: "ط§ظ„ط«ط§ظ†ظٹ", 7: "ط§ظ„ط«ط§ظ„ط«", 10: "ط§ظ„ط±ط§ط¨ط¹"}
+        q_label = f"ط§ظ„ط±ط¨ط¹ {names.get(qm, 'ط§ظ„ط­ط§ظ„ظٹ')} {today.year}"
         q_start = date(today.year, qm, 1)
         qem = qm + 2
         ld = 31 if qem in [1,3,5,7,8,10,12] else 30 if qem in [4,6,9,11] else 28
@@ -511,7 +499,7 @@ async def _period_data_for_dates(pool, tid, did, start_date, end_date):
               AND d.doc_date::date >= $3 AND d.doc_date::date <= $4
               AND d.document_type_id = ANY($5::text[])
             GROUP BY d.document_type_id
-        """, tid, did, start_date, end_date, [SALES, REFUND, PURCHASE])
+        """, tid, did, start_date, end_date, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
         # Dashboard QR purchase invoices (merged with Aronium purchases)
         try:
@@ -520,7 +508,7 @@ async def _period_data_for_dates(pool, tid, did, start_date, end_date):
                        COALESCE(SUM(vat_amount), 0) AS vat_total
                 FROM dashboard_purchase_invoice
                 WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-                  AND issued_at::timestamp >= $3 AND issued_at::timestamp <= $4
+                  AND issued_at >= $3 AND issued_at < ($4::date + INTERVAL '1 day')
             """, tid, did, start_date, end_date)
         except Exception:
             qr_rows = []
@@ -538,6 +526,7 @@ async def _period_data_for_dates(pool, tid, did, start_date, end_date):
         if dt == SALES: tax_s = t
         elif dt == REFUND: tax_r = abs(t)
         elif dt == PURCHASE: tax_p = t
+        elif dt == STOCK_RETURN: tax_p -= abs(t)
 
     # Add QR invoices to purchases and VAT
     qr_purchase_count = 0
@@ -601,8 +590,8 @@ async def portal_quarter(request: Request, tenant_id: Optional[str] = None):
         prev_data = await _period_data_for_dates(pool, tid, did, prev_start, prev_end)
         
         # Quarter label
-        names = {1: "الأول", 4: "الثاني", 7: "الثالث", 10: "الرابع"}
-        prev_label = f"الربع {names.get(prev_qm, 'السابق')} {prev_year}"
+        names = {1: "ط§ظ„ط£ظˆظ„", 4: "ط§ظ„ط«ط§ظ†ظٹ", 7: "ط§ظ„ط«ط§ظ„ط«", 10: "ط§ظ„ط±ط§ط¨ط¹"}
+        prev_label = f"ط§ظ„ط±ط¨ط¹ {names.get(prev_qm, 'ط§ظ„ط³ط§ط¨ظ‚')} {prev_year}"
         prev_data["quarter_label"] = prev_label
         prev_data["quarter_start"] = prev_start.isoformat()
         prev_data["quarter_end"] = prev_end.isoformat()
@@ -666,7 +655,7 @@ async def portal_quarter_details(request: Request, tenant_id: Optional[str] = No
               AND d.document_type_id = ANY($5::text[])
             GROUP BY month, d.document_type_id
             ORDER BY month
-        """, tid, did, q_start, q_end, [SALES, REFUND, PURCHASE])
+        """, tid, did, q_start, q_end, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
         # Dashboard QR purchase invoices (merged with Aronium purchases)
         try:
@@ -676,8 +665,8 @@ async def portal_quarter_details(request: Request, tenant_id: Optional[str] = No
                        COALESCE(SUM(vat_amount), 0) AS vat_total
                 FROM dashboard_purchase_invoice
                 WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-                  AND issued_at::date >= $3 
-                  AND issued_at::date <= $4
+                  AND issued_at >= $3
+                  AND issued_at < ($4::date + INTERVAL '1 day')
                 GROUP BY month
                 ORDER BY month
             """, tid, did, q_start, q_end)
@@ -780,8 +769,8 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
                 FROM dashboard_purchase_invoice dpi
                 LEFT JOIN devices dev ON dev.id = dpi.device_id
                 WHERE dpi.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dpi.device_id = $2::uuid)
-                  AND issued_at::timestamp >= $3 
-                  AND issued_at::timestamp < $4
+                  AND issued_at >= $3
+                  AND issued_at < $4
                 ORDER BY dpi.issued_at DESC
             """, tid, did, start, end)
         except Exception:
@@ -805,11 +794,11 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
         # Skip StartingCash with amount=0 (opening cash - not a transaction)
         if float(r["amount"] or 0) == 0:
             continue
-        
+
         operations.append({
             "id": str(r["id"]),
             "type": "expense" if r["starting_cash_type"] == 1 else "income",
-            "number": "وارد خزينة" if r["starting_cash_type"] == 0 else "مصروف خزينة",
+            "number": "ظˆط§ط±ط¯ ط®ط²ظٹظ†ط©" if r["starting_cash_type"] == 0 else "ظ…طµط±ظˆظپ ط®ط²ظٹظ†ط©",
             "date": r["date_created"].isoformat() if r["date_created"] else "",
             "amount": round(n(r["amount"]), 2),
             "branch_name": r["branch_name"] or "",
@@ -970,5 +959,6 @@ async def mark_all_notifications_read(request: Request):
             "UPDATE notifications SET is_read = true WHERE tenant_id = $1::uuid AND is_read = false",
             tid
         )
-    
+
     return {"success": True}
+
