@@ -670,7 +670,22 @@ function updateSidebarActive() {
 function selectBranch(deviceId) {
   CURRENT_BRANCH = deviceId;
   updateSidebarActive();
+  updateScanTabVisibility();
   refreshData();
+}
+
+function updateScanTabVisibility() {
+  var scanTab = document.querySelector('.tab[onclick*="scan"]');
+  if (scanTab) {
+    if (CURRENT_BRANCH === null) {
+      scanTab.style.display = 'none';
+      if (currentTab === 'scan') {
+        switchTab('today', document.querySelector('.tab[onclick*="today"]'));
+      }
+    } else {
+      scanTab.style.display = '';
+    }
+  }
 }
 
 function selectDefaultBranch() {
@@ -680,6 +695,7 @@ function selectDefaultBranch() {
   }
   CURRENT_BRANCH = mainBranch ? mainBranch.device_id : null;
   updateSidebarActive();
+  updateScanTabVisibility();
   refreshData();
 }
 
@@ -1432,6 +1448,15 @@ function renderScanTab() {
     
     + '<button class="btn" id="startScanBtn" onclick="startQRScan()" style="margin-bottom:16px">بدء المسح</button>'
     
+    + '<div style="background:#e0f2fe;border:1px solid #0284c7;padding:12px;border-radius:8px;margin-bottom:16px">'
+    + '<strong style="color:#0369a1">تعليمات عامة:</strong>'
+    + '<ul style="color:#0369a1;font-size:13px;margin:8px 0 0 0;padding-right:20px">'
+    + '<li>تأكد أن الفاتورة صحيحة وموجهة إليك</li>'
+    + '<li>يمكنك التحقق من صحتها عبر تطبيق هيئة الزكاة والضريبة والجمارك</li>'
+    + '<li>هذه الخدمة فقط لضبط حساباتك وإقرارك الضريبي</li>'
+    + '</ul>'
+    + '</div>'
+    
     + '<div id="qrResult" style="display:none">'
     + '<div style="background:var(--bg);padding:16px;border-radius:8px;margin-bottom:16px">'
     + '<div style="display:grid;gap:12px">'
@@ -1444,7 +1469,7 @@ function renderScanTab() {
     + '</div>'
     
     + '<div style="background:#fff3cd;border:1px solid #ffc107;padding:12px;border-radius:8px;margin-bottom:16px">'
-    + '<strong style="color:#856404">تنبيه:</strong> <span style="color:#856404;font-size:13px">أنت تتحمل مسؤولية صحة بيانات هذه الفاتورة. تأكد من مطابقتها للفاتورة الأصلية.</span>'
+    + '<strong style="color:#856404">تنبيه:</strong> <span style="color:#856404;font-size:13px">أنت تتحمل مسؤولية صحة بيانات هذه الفاتورة. تأكد من مطابقتها للفاتورة الأصلية وأنها موجهة إليك بحسب توجيهات هيئة الزكاة والضريبة والجمارك.</span>'
     + '</div>'
     
     + '<div style="display:flex;gap:12px">'
