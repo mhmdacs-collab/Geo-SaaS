@@ -855,9 +855,13 @@ async def portal_sync_status(request: Request, tenant_id: Optional[str] = None):
             FROM devices WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR id = $2::uuid)
             ORDER BY registered_at
         """, tid, did)
-    last = row["last_doc_date"]
+    
+    # استخدام last_seen من devices بدلاً من last_doc_date من document
+    # لأن last_seen يتحدّث مع كل heartbeat
+    last_seen = max([d["last_seen"] for d in devices if d["last_seen"]], default=None)
+    
     return {
-        "last_doc_date": _saudi_iso(last),
+        "last_doc_date": _saudi_iso(last_seen),  # استخدام last_seen
         "total_invoices": row["total_invoices"] or 0,
         "devices": [{
             "device_id": str(d["device_id"]), "branch_name": d["branch_name"],
