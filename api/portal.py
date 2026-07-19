@@ -775,8 +775,8 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
         # Use created_at (scan date) for ordering, not issued_at (invoice date)
         try:
             qr_rows = await conn.fetch("""
-                SELECT id, seller_name, total_amount, vat_amount, issued_at, created_at, device_id,
-                       invoice_number,
+                SELECT dpi.id, dpi.seller_name, dpi.total_amount, dpi.vat_amount, dpi.issued_at, dpi.created_at, dpi.device_id,
+                       dpi.invoice_number,
                        dev.branch_name
                 FROM dashboard_purchase_invoice dpi
                 LEFT JOIN devices dev ON dpi.device_id = dev.id
