@@ -744,7 +744,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
     pool = state.pool
 
     async with pool.acquire() as conn:
-        # Unified query: all document types + treasury, sorted by date, last 7
+        # Aronium documents: get last 20 regardless of date (for recent operations)
         doc_rows = await conn.fetch("""
             SELECT d.id, d.document_type_id, d.number, d.date_created,
                    d.total, d.device_id,
@@ -755,20 +755,21 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
             LEFT JOIN payment p ON p.document_id = d.id AND p.tenant_id = d.tenant_id AND p.device_id = d.device_id
             LEFT JOIN payment_type pt ON pt.id = p.payment_type_id AND pt.tenant_id = p.tenant_id AND pt.device_id = p.device_id
             WHERE d.tenant_id = $1::uuid AND ($2::uuid IS NULL OR d.device_id = $2::uuid)
-              AND d.date_created >= $3 AND d.date_created < $4
-              AND d.document_type_id = ANY($5::text[])
+              AND d.document_type_id = ANY($3::text[])
             ORDER BY d.date_created DESC
-        """, tid, did, start, end, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+            LIMIT 20
+        """, tid, did, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
+        # Treasury: get last 20 regardless of date (for recent operations)
         treasury_rows = await conn.fetch("""
             SELECT sc.id, sc.starting_cash_type, sc.amount, sc.date_created,
                    sc.device_id, dev.branch_name
             FROM starting_cash sc
             LEFT JOIN devices dev ON dev.id = sc.device_id
             WHERE sc.tenant_id = $1::uuid AND ($2::uuid IS NULL OR sc.device_id = $2::uuid)
-              AND sc.date_created >= $3 AND sc.date_created < $4
             ORDER BY sc.date_created DESC
-        """, tid, did, start, end)
+            LIMIT 20
+        """, tid, did)
 
         # Dashboard QR purchase invoices (merged with recent operations)
         # Get last 20 QR invoices regardless of date range
