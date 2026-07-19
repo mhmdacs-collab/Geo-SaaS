@@ -744,7 +744,7 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
     pool = state.pool
 
     async with pool.acquire() as conn:
-        # Aronium documents: get last 20 regardless of date (for recent operations)
+        # Aronium documents: get last 20 within the period (day/yesterday)
         doc_rows = await conn.fetch("""
             SELECT d.id, d.document_type_id, d.number, d.date_created,
                    d.total, d.device_id,
@@ -755,25 +755,26 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
             LEFT JOIN payment p ON p.document_id = d.id AND p.tenant_id = d.tenant_id AND p.device_id = d.device_id
             LEFT JOIN payment_type pt ON pt.id = p.payment_type_id AND pt.tenant_id = p.tenant_id AND pt.device_id = p.device_id
             WHERE d.tenant_id = $1::uuid AND ($2::uuid IS NULL OR d.device_id = $2::uuid)
-              AND d.document_type_id = ANY($3::text[])
+              AND d.date_created >= $3 AND d.date_created < $4
+              AND d.document_type_id = ANY($5::text[])
             ORDER BY d.date_created DESC
             LIMIT 20
-        """, tid, did, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+        """, tid, did, start, end, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
-        # Treasury: get last 20 regardless of date (for recent operations)
+        # Treasury: get last 20 within the period (day/yesterday)
         treasury_rows = await conn.fetch("""
             SELECT sc.id, sc.starting_cash_type, sc.amount, sc.date_created,
                    sc.device_id, dev.branch_name
             FROM starting_cash sc
             LEFT JOIN devices dev ON dev.id = sc.device_id
             WHERE sc.tenant_id = $1::uuid AND ($2::uuid IS NULL OR sc.device_id = $2::uuid)
+              AND sc.date_created >= $3 AND sc.date_created < $4
             ORDER BY sc.date_created DESC
             LIMIT 20
-        """, tid, did)
+        """, tid, did, start, end)
 
-        # Dashboard QR purchase invoices (merged with recent operations)
-        # Get last 20 QR invoices regardless of date range
-        # Use created_at (scan date) for ordering, not issued_at (invoice date)
+        # Dashboard QR purchase invoices: get last 20 within the period (day/yesterday)
+        # Use created_at (scan date) for filtering
         try:
             qr_rows = await conn.fetch("""
                 SELECT dpi.id, dpi.seller_name, dpi.total_amount, dpi.vat_amount, dpi.issued_at, dpi.created_at, dpi.device_id,
@@ -782,9 +783,10 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
                 FROM dashboard_purchase_invoice dpi
                 LEFT JOIN devices dev ON dpi.device_id = dev.id
                 WHERE dpi.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dpi.device_id = $2::uuid)
+                  AND dpi.created_at >= $3 AND dpi.created_at < $4
                 ORDER BY dpi.created_at DESC
                 LIMIT 20
-            """, tid, did)
+            """, tid, did, start, end)
         except Exception:
             qr_rows = []
 
