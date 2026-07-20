@@ -351,15 +351,19 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
         """, tid, did, start, end, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
         pay_rows = await conn.fetch("""
-            SELECT pt.name AS pay_name, COALESCE(SUM(p.amount), 0) AS total
+            SELECT pt.name AS pay_name, COALESCE(SUM(
+                CASE WHEN d.document_type_id = $5 THEN p.amount
+                     WHEN d.document_type_id = $6 THEN -p.amount
+                     ELSE 0 END
+            ), 0) AS total
             FROM payment p
             JOIN document d ON d.id = p.document_id AND d.tenant_id = p.tenant_id AND d.device_id = p.device_id
             JOIN payment_type pt ON pt.id = p.payment_type_id AND pt.tenant_id = p.tenant_id AND pt.device_id = p.device_id
             WHERE p.tenant_id = $1::uuid AND ($2::uuid IS NULL OR p.device_id = $2::uuid)
               AND d.date_created >= $3 AND d.date_created < $4
-              AND d.document_type_id = $5
+              AND d.document_type_id = ANY($7::text[])
             GROUP BY pt.name
-        """, tid, did, start, end, SALES)
+        """, tid, did, start, end, SALES, REFUND, [SALES, REFUND])
 
         # Treasury: starting_cash (0=income, 1=expense)
         treasury_rows = await conn.fetch("""
@@ -440,15 +444,19 @@ async def _period_data(pool, tid, did, period):
         """, tid, did, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
         pay_rows = await conn.fetch(f"""
-            SELECT pt.name AS pay_name, COALESCE(SUM(p.amount), 0) AS total
+            SELECT pt.name AS pay_name, COALESCE(SUM(
+                CASE WHEN d.document_type_id = $3 THEN p.amount
+                     WHEN d.document_type_id = $4 THEN -p.amount
+                     ELSE 0 END
+            ), 0) AS total
             FROM payment p
             JOIN document d ON d.id = p.document_id AND d.tenant_id = p.tenant_id AND d.device_id = p.device_id
             JOIN payment_type pt ON pt.id = p.payment_type_id AND pt.tenant_id = p.tenant_id AND pt.device_id = p.device_id
             WHERE p.tenant_id = $1::uuid AND ($2::uuid IS NULL OR p.device_id = $2::uuid)
               AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-              AND d.document_type_id = $3
+              AND d.document_type_id = ANY($5::text[])
             GROUP BY pt.name
-        """, tid, did, SALES)
+        """, tid, did, SALES, REFUND, [SALES, REFUND])
 
         branch_rows = await conn.fetch(f"""
             SELECT d.device_id, dev.branch_name, COALESCE(SUM(d.total), 0) AS total
