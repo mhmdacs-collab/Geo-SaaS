@@ -35,3 +35,10 @@ jobs:
         else
           echo "No DEPLOYED_HEALTH_URL secret configured; skipping remote healthcheck"
         fi
+
+    - name: Run integration test against deployed app (optional)
+      if: ${{ secrets.DEPLOYED_BASE_URL != '' && secrets.INTEGRATION_TAX != '' && secrets.INTEGRATION_PASSWORD != '' }}
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+        python api/tests/integration_test.py
