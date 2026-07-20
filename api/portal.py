@@ -23,6 +23,7 @@ import jwt
 from fastapi import APIRouter, Request, HTTPException
 import hashlib
 import bcrypt
+import os
 
 log = logging.getLogger("ingest")
 SAUDI_TZ = timezone(timedelta(hours=3))
@@ -120,16 +121,36 @@ def _make_portal_token(tenant_id, tax, store, close_hour=0, onboarded=False, jwt
 async def _require_portal(authorization=None, jwt_secret="", jwt_alg=""):
     if not authorization:
         raise HTTPException(401, "Token missing")
+    tok = authorization.replace("Bearer ", "")
+    payload = None
+    # First try the provided primary secret
     try:
-        tok = authorization.replace("Bearer ", "")
-        # Decode without audience verification first
         payload = jwt.decode(tok, jwt_secret, algorithms=[jwt_alg], options={"verify_aud": False})
-        # Verify audience if present (new tokens have it, legacy tokens don't)
         if "aud" in payload and payload["aud"] != "portal":
             raise HTTPException(401, "Invalid audience")
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Session expired")
     except jwt.InvalidTokenError:
+        # Try any additional secrets listed in JWT_SECRETS env (rotation support)
+        _secrets_env = os.environ.get("JWT_SECRETS", "").strip()
+        if _secrets_env:
+            for s in (p.strip() for p in _secrets_env.split(",") if p.strip()):
+                if s == jwt_secret:
+                    continue
+                try:
+                    payload = jwt.decode(tok, s, algorithms=[jwt_alg], options={"verify_aud": False})
+                    if "aud" in payload and payload["aud"] != "portal":
+                        payload = None
+                        continue
+                    break
+                except jwt.ExpiredSignatureError:
+                    raise HTTPException(401, "Session expired")
+                except jwt.InvalidTokenError:
+                    payload = None
+                    continue
+        if payload is None:
+            raise HTTPException(401, "Invalid token")
+    if payload is None:
         raise HTTPException(401, "Invalid token")
     if payload.get("sub") != "portal":
         raise HTTPException(401, "Wrong token type")

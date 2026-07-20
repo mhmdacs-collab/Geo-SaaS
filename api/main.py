@@ -28,10 +28,24 @@ import purchase_qr
 # Config
 # ────────────────────────────────────────────────────────────────────────────
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
-JWT_SECRET = os.environ.get("JWT_SECRET", "")
+# Support rotating secrets: JWT_SECRETS can be a comma-separated list (new,old,...)
+_jwt_secrets_env = os.environ.get("JWT_SECRETS", "").strip()
+if _jwt_secrets_env:
+    JWT_SECRETS = [s for s in (p.strip() for p in _jwt_secrets_env.split(",")) if s]
+else:
+    _single_jwt = os.environ.get("JWT_SECRET", "").strip()
+    JWT_SECRETS = [_single_jwt] if _single_jwt else []
+# Primary secret (used for signing new tokens)
+JWT_SECRET = JWT_SECRETS[0] if JWT_SECRETS else ""
 JWT_ALG = "HS256"
 JWT_AUDIENCE = os.environ.get("JWT_AUDIENCE", "aronium-agent")
-ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY", "")
+# Support multiple admin API keys via ADMIN_API_KEYS (comma-separated) falling back to ADMIN_API_KEY
+_admin_keys_env = os.environ.get("ADMIN_API_KEYS", "").strip()
+if _admin_keys_env:
+    ADMIN_API_KEYS = [s for s in (p.strip() for p in _admin_keys_env.split(",")) if s]
+else:
+    _single_admin = os.environ.get("ADMIN_API_KEY", "").strip()
+    ADMIN_API_KEYS = [_single_admin] if _single_admin else []
 CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
 JWT_TTL_DAYS = int(os.environ.get("JWT_TTL_DAYS", "30"))  # Reduced from 365 to 30 days
 SUPPORT_WA = os.environ.get("SUPPORT_WA", "966558110150")
@@ -98,8 +112,11 @@ async def lifespan(app: FastAPI):
     app.state.pool = await asyncpg.create_pool(
         dsn=_clean_dsn(DATABASE_URL), min_size=1, max_size=10, command_timeout=60,
     )
+    # expose list of accepted JWT secrets and the primary secret used for signing
+    app.state.jwt_secrets = JWT_SECRETS
     app.state.jwt_secret = JWT_SECRET
     app.state.jwt_alg = JWT_ALG
+    app.state.admin_api_keys = ADMIN_API_KEYS
     app.state.support_wa = SUPPORT_WA
     log.info("DB pool ready")
     try:
