@@ -40,18 +40,27 @@ def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Verify password against hash (supports bcrypt and legacy SHA-256)."""
+    """Verify password against hash (supports bcrypt and legacy SHA-256).
+
+    Notes:
+    - bcrypt hashes are accepted as-is.
+    - legacy SHA-256 hashes are accepted for migration; callers should re-hash to bcrypt after a successful login.
+    - plaintext or unknown formats are NOT accepted to avoid weak-storage risks.
+    """
     if not hashed:
         return False
-    # Check if it's a bcrypt hash (starts with $2b$)
-    if hashed.startswith('$2b$'):
-        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    # bcrypt (allow common prefixes)
+    if hashed.startswith(('$2b$','$2a$','$2y$')):
+        try:
+            return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+        except Exception:
+            return False
     # Legacy SHA-256 support for migration
     if len(hashed) == 64 and all(c in '0123456789abcdef' for c in hashed):
         salt = "aronium_salt_2024"
         return hashlib.sha256(f"{salt}{password}".encode('utf-8')).hexdigest() == hashed
-    # Plain text comparison (for phone_number or old plain passwords)
-    return password.strip() == hashed.strip()
+    # Unknown/unsafe format (including plaintext) - do not accept
+    return False
 
 _LOGIN_HITS: Dict[str, deque] = defaultdict(deque)
 _LOGIN_WINDOW = 60.0
@@ -185,7 +194,23 @@ async def portal_login(body: dict, request: Request):
         # Use password column directly (copied from phone_number initially)
         has_custom = bool(tenant["password"] and tenant["password"] != tenant["phone_number"])
         active_password = tenant["password"] or tenant["phone_number"]
-        ok = verify_password(pwd, active_password)
+        # Determine password format and verify. For legacy SHA-256, rehash to bcrypt on successful login.
+        ok = False
+        if active_password and (active_password.startswith('$2b$') or active_password.startswith('$2a$') or active_password.startswith('$2y$')):
+            ok = verify_password(pwd, active_password)
+        elif active_password and len(active_password) == 64 and all(c in '0123456789abcdef' for c in active_password):
+            # legacy SHA-256 - verify, then rehash to bcrypt
+            ok = verify_password(pwd, active_password)
+            if ok:
+                new_hashed = hash_password(pwd)
+                try:
+                    await conn.execute("UPDATE tenants SET password = $1 WHERE id = $2", new_hashed, tenant["tenant_id"])
+                except Exception:
+                    log.exception("Failed to rehash legacy password for tenant %s", tenant["tenant_id"])
+        else:
+            # Plaintext or unknown formats — require password reset (do not accept plaintext)
+            raise HTTPException(401, "Password requires reset; please use password reset flow")
+
         if not ok:
             raise HTTPException(401, "Incorrect password")
 
