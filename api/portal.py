@@ -208,8 +208,22 @@ async def portal_login(body: dict, request: Request):
                 except Exception:
                     log.exception("Failed to rehash legacy password for tenant %s", tenant["tenant_id"])
         else:
-            # Plaintext or unknown formats — require password reset (do not accept plaintext)
-            raise HTTPException(401, "Password requires reset; please use password reset flow")
+            # Allow plaintext if it equals the tenant's phone_number (webhook-created account flow)
+            try:
+                phone = tenant.get("phone_number") or ""
+            except Exception:
+                phone = ""
+            if phone and pwd == phone:
+                # Accept plaintext first-login, rehash to bcrypt immediately
+                ok = True
+                new_hashed = hash_password(pwd)
+                try:
+                    await conn.execute("UPDATE tenants SET password = $1 WHERE id = $2", new_hashed, tenant["tenant_id"])
+                except Exception:
+                    log.exception("Failed to rehash plaintext phone-password for tenant %s", tenant["tenant_id"])
+            else:
+                # Unknown/unsafe format - require reset
+                raise HTTPException(401, "Password requires reset; please use password reset flow")
 
         if not ok:
             raise HTTPException(401, "Incorrect password")
