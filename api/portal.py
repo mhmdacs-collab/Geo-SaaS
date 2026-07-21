@@ -459,15 +459,27 @@ async def _period_data(pool, tid, did, period):
         """, tid, did, SALES, REFUND, [SALES, REFUND])
 
         branch_rows = await conn.fetch(f"""
-            SELECT d.device_id, dev.branch_name, COALESCE(SUM(d.total), 0) AS total
+            SELECT d.device_id, dev.branch_name, d.document_type_id,
+                   COALESCE(SUM(d.total), 0) AS total
             FROM document d
             JOIN devices dev ON dev.id = d.device_id
             WHERE d.tenant_id = $1::uuid
               AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-              AND d.document_type_id = $2
-            GROUP BY d.device_id, dev.branch_name
-            ORDER BY total DESC
-        """, tid, SALES)
+              AND d.document_type_id = ANY($2::text[])
+            GROUP BY d.device_id, dev.branch_name, d.document_type_id
+        """, tid, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+
+        branch_tax_rows = await conn.fetch(f"""
+            SELECT d.device_id, d.document_type_id,
+                   COALESCE(SUM(dt.amount), 0) AS tax_total
+            FROM document_item_tax dt
+            JOIN document_item di ON di.id = dt.document_item_id AND di.tenant_id = dt.tenant_id AND di.device_id = dt.device_id
+            JOIN document d ON d.id = di.document_id AND d.tenant_id = di.tenant_id AND d.device_id = di.device_id
+            WHERE dt.tenant_id = $1::uuid
+              AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+              AND d.document_type_id = ANY($2::text[])
+            GROUP BY d.device_id, d.document_type_id
+        """, tid, [SALES, REFUND, PURCHASE, STOCK_RETURN])
 
         # Treasury: starting_cash (0=income, 1=expense)
         treasury_rows = await conn.fetch(f"""
@@ -517,6 +529,43 @@ async def _period_data(pool, tid, did, period):
         tax_p += n(qr_rows[0]["vat_total"])
         qr_purchase_count = int(qr_rows[0]["cnt"])
 
+    # Build per-branch profit and VAT breakdown
+    _branch_map = {}
+    _branch_names = {}
+    for r in branch_rows:
+        dev_id = str(r["device_id"])
+        _branch_names[dev_id] = r["branch_name"]
+        if dev_id not in _branch_map:
+            _branch_map[dev_id] = {"sales": 0.0, "refund": 0.0, "purchases": 0.0,
+                                    "stock_return": 0.0, "tax_s": 0.0, "tax_r": 0.0, "tax_p": 0.0}
+        t = n(r["total"]); dt = r["document_type_id"]
+        if dt == SALES: _branch_map[dev_id]["sales"] = t
+        elif dt == REFUND: _branch_map[dev_id]["refund"] = abs(t)
+        elif dt == PURCHASE: _branch_map[dev_id]["purchases"] = t
+        elif dt == STOCK_RETURN: _branch_map[dev_id]["stock_return"] = abs(t)
+    for r in branch_tax_rows:
+        dev_id = str(r["device_id"])
+        if dev_id not in _branch_map:
+            _branch_map[dev_id] = {"sales": 0.0, "refund": 0.0, "purchases": 0.0,
+                                    "stock_return": 0.0, "tax_s": 0.0, "tax_r": 0.0, "tax_p": 0.0}
+        t = n(r["tax_total"]); dt = r["document_type_id"]
+        if dt == SALES: _branch_map[dev_id]["tax_s"] = t
+        elif dt == REFUND: _branch_map[dev_id]["tax_r"] = abs(t)
+        elif dt == PURCHASE: _branch_map[dev_id]["tax_p"] = t
+        elif dt == STOCK_RETURN: _branch_map[dev_id]["tax_p"] -= abs(t)
+    branch_breakdown = []
+    for dev_id, b in _branch_map.items():
+        net_sales_b = b["sales"] - b["refund"]
+        net_purchases_b = b["purchases"] - b["stock_return"]
+        branch_breakdown.append({
+            "device_id": dev_id,
+            "branch_name": _branch_names.get(dev_id, ""),
+            "total": round(b["sales"], 2),
+            "net_profit": round(net_sales_b - net_purchases_b, 2),
+            "vat_due": round((b["tax_s"] - b["tax_r"]) - b["tax_p"], 2),
+        })
+    branch_breakdown.sort(key=lambda x: x["total"], reverse=True)
+
     q_label = ""; progress = days_remaining = 0
     if period == "quarter":
         today = date.today()
@@ -545,7 +594,7 @@ async def _period_data(pool, tid, did, period):
         "treasury_in": round(treasury_in, 2),
         "treasury_out": round(treasury_out, 2),
         "payment_breakdown": {r["pay_name"]: round(n(r["total"]), 2) for r in pay_rows},
-        "branch_breakdown": [{"device_id": str(r["device_id"]), "branch_name": r["branch_name"], "total": round(n(r["total"]), 2)} for r in branch_rows],
+        "branch_breakdown": branch_breakdown,
         "quarter_progress": progress, "days_remaining": days_remaining,
         "period_label": q_label if q_label else date.today().strftime("%B %Y"),
         "sales_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == SALES),
