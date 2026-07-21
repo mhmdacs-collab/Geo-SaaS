@@ -862,7 +862,7 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
                         ]
                 await conn.executemany(sql, rows_to_write)
         
-        # Send notification for ZReport (daily close) — include branch name and time
+        # Send notification + record day_session for ZReport (daily close)
         if req.table.lower() == "zreport" and new_z_numbers:
             try:
                 async with pool.acquire() as conn:
@@ -872,12 +872,41 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
                     )
                     branch_name = dev_row["branch_name"] if dev_row else "الفرع"
                     saudi = timezone(timedelta(hours=3))
-                    now_saudi = datetime.now(saudi)
+                    now_utc = datetime.now(timezone.utc)
+                    now_saudi = now_utc.astimezone(saudi)
                     hour = now_saudi.hour
                     minute = now_saudi.minute
-                    period = "صباحاً" if hour < 12 else "مساءً"
+                    period_label = "صباحاً" if hour < 12 else "مساءً"
                     hour12 = hour % 12 or 12
-                    time_str = f"{hour12:02d}:{minute:02d} {period}"
+                    time_str = f"{hour12:02d}:{minute:02d} {period_label}"
+
+                    # Determine period_start: end of the previous day_session
+                    prev = await conn.fetchrow(
+                        """SELECT period_end FROM day_sessions
+                           WHERE tenant_id=$1::uuid AND device_id=$2::uuid
+                           ORDER BY period_end DESC LIMIT 1""",
+                        ctx.tenant_id, ctx.device_id,
+                    )
+                    if prev and (now_utc - prev["period_end"]) < timedelta(hours=36):
+                        period_start = prev["period_end"]
+                    else:
+                        # First close or too long ago — use close_hour-based start
+                        close_row = await conn.fetchrow(
+                            "SELECT COALESCE(close_hour, 0) AS close_hour FROM tenants WHERE id=$1::uuid",
+                            ctx.tenant_id,
+                        )
+                        ch = int(close_row["close_hour"] if close_row else 0)
+                        close_saudi = datetime(now_saudi.year, now_saudi.month, now_saudi.day, ch, tzinfo=saudi)
+                        if now_saudi < close_saudi:
+                            close_saudi -= timedelta(days=1)
+                        period_start = close_saudi.astimezone(timezone.utc)
+
+                    await conn.execute(
+                        """INSERT INTO day_sessions
+                               (tenant_id, device_id, period_start, period_end, source)
+                           VALUES ($1::uuid, $2::uuid, $3, $4, 'z_report')""",
+                        ctx.tenant_id, ctx.device_id, period_start, now_utc,
+                    )
                     for z_number in new_z_numbers:
                         await conn.execute(
                             """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
@@ -1010,6 +1039,7 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
 
         window_start_utc = window_start_saudi.astimezone(timezone.utc)
         window_end_utc = window_end_saudi.astimezone(timezone.utc)
+        now_utc = now_saudi.astimezone(timezone.utc)
 
         # Check for manual ZReport within the current business day window
         z_count = await conn.fetchval(
@@ -1027,19 +1057,16 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
             # Manual close already happened for this business day
             return {"auto_close": False}
 
-        # Avoid spamming: at most one auto-close notification per business day
-        existing = await conn.fetchval(
-            """
-            SELECT COUNT(*) FROM notifications
-            WHERE tenant_id=$1::uuid
-              AND device_id=$2::uuid
-              AND notification_type='auto_close'
-              AND created_at >= $3::timestamptz
-              AND created_at <  $4::timestamptz
-            """,
+        # Avoid spamming: at most one close (z_report or auto) per business day
+        existing_session = await conn.fetchval(
+            """SELECT COUNT(*) FROM day_sessions
+               WHERE tenant_id=$1::uuid
+                 AND device_id=$2::uuid
+                 AND period_end >= $3::timestamptz
+                 AND period_end <  $4::timestamptz""",
             ctx.tenant_id, ctx.device_id, window_start_utc, window_end_utc,
         )
-        if existing and existing > 0:
+        if existing_session and existing_session > 0:
             return {"auto_close": False}
 
         # Fetch branch name for notification
@@ -1049,6 +1076,13 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
         )
         branch_name = dev_row["branch_name"] if dev_row else "الفرع"
 
+        # Record the closed session and notify
+        await conn.execute(
+            """INSERT INTO day_sessions
+                   (tenant_id, device_id, period_start, period_end, source)
+               VALUES ($1::uuid, $2::uuid, $3, $4, 'auto')""",
+            ctx.tenant_id, ctx.device_id, window_start_utc, now_utc,
+        )
         await conn.execute(
             """INSERT INTO notifications
                (tenant_id, device_id, notification_type, message)
