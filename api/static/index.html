@@ -841,9 +841,9 @@ function renderMonthData(d) {
   // 4. قنوات الدفع
   html += renderPaymentsPanel(d.payment_breakdown);
 
-  // 5. مقارنة الفروع (only when all branches)
+  // 5. مقارنة الفروع (only when all branches) — by net profit
   if (CURRENT_BRANCH === null && d.branch_breakdown) {
-    html += renderBranchComparePanel(d.branch_breakdown);
+    html += renderBranchComparePanel(d.branch_breakdown, 'net_profit', 'مقارنة الفروع — صافي الربح');
   }
 
   document.getElementById('dashboardContent').innerHTML = html;
@@ -928,7 +928,7 @@ function renderQuarterData(d) {
 
   // ── مقارنة الفروع ────────────────────────────────────────────
   if (CURRENT_BRANCH === null && cur.branch_breakdown) {
-    html += renderBranchComparePanel(cur.branch_breakdown);
+    html += renderBranchComparePanel(cur.branch_breakdown, 'vat_due', 'مقارنة الفروع — المستحق للضريبة');
   }
 
   document.getElementById('dashboardContent').innerHTML = html;
@@ -1008,19 +1008,27 @@ function renderTaxSection(d) {
   return html;
 }
 
-function renderBranchComparePanel(bb) {
+function renderBranchComparePanel(bb, valueKey, panelLabel) {
   if (!bb || !bb.length) return '';
+  var key = valueKey || 'total';
+  var title = panelLabel || 'مقارنة الفروع';
+  // Sort by the requested metric descending
+  var sorted = bb.slice().sort(function(a, b) { return (b[key] || 0) - (a[key] || 0); });
+  var max = 0;
+  for (var i = 0; i < sorted.length; i++) { var v = sorted[i][key] || 0; if (v > max) max = v; }
+  // For vat_due / net_profit, bars should use absolute value for width but show actual value
+  var maxAbs = 0;
+  for (var i = 0; i < sorted.length; i++) { var v = Math.abs(sorted[i][key] || 0); if (v > maxAbs) maxAbs = v; }
+  var colors = ['#00BCD4','#10b981','#8b5cf6','#f59e0b','#ef4444','#0891B2'];
   var html = '<div class="branch-cmp"><div class="cmp-title">'
     + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>'
-    + 'مقارنة الفروع</div>';
-  var max = 0;
-  for (var i = 0; i < bb.length; i++) if (bb[i].total > max) max = bb[i].total;
-  var colors = ['#00BCD4','#10b981','#8b5cf6','#f59e0b','#ef4444','#0891B2'];
-  for (var i = 0; i < bb.length; i++) {
-    var pct = max > 0 ? (bb[i].total / max * 100) : 0;
-    var c = colors[i % colors.length];
+    + title + '</div>';
+  for (var i = 0; i < sorted.length; i++) {
+    var val = sorted[i][key] || 0;
+    var pct = maxAbs > 0 ? (Math.abs(val) / maxAbs * 100) : 0;
+    var c = val < 0 ? '#ef4444' : colors[i % colors.length];
     html += '<div class="cmp-row">'
-      + '<div class="cmp-label"><span>' + escapeHtml(bb[i].branch_name) + '</span><span>' + fmt(bb[i].total) + '</span></div>'
+      + '<div class="cmp-label"><span>' + escapeHtml(sorted[i].branch_name) + '</span><span>' + fmt(val) + '</span></div>'
       + '<div class="cmp-bar"><div class="cmp-fill" style="width:' + pct + '%;background:' + c + '"></div></div>'
       + '</div>';
   }
