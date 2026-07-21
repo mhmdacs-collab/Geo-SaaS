@@ -862,15 +862,28 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
                         ]
                 await conn.executemany(sql, rows_to_write)
         
-        # Send notification for ZReport (daily close)
+        # Send notification for ZReport (daily close) — include branch name and time
         if req.table.lower() == "zreport" and new_z_numbers:
             try:
                 async with pool.acquire() as conn:
+                    dev_row = await conn.fetchrow(
+                        "SELECT branch_name FROM devices WHERE id=$1::uuid AND tenant_id=$2::uuid",
+                        ctx.device_id, ctx.tenant_id,
+                    )
+                    branch_name = dev_row["branch_name"] if dev_row else "الفرع"
+                    saudi = timezone(timedelta(hours=3))
+                    now_saudi = datetime.now(saudi)
+                    hour = now_saudi.hour
+                    minute = now_saudi.minute
+                    period = "صباحاً" if hour < 12 else "مساءً"
+                    hour12 = hour % 12 or 12
+                    time_str = f"{hour12:02d}:{minute:02d} {period}"
                     for z_number in new_z_numbers:
                         await conn.execute(
                             """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
                                VALUES ($1::uuid, $2::uuid, 'daily_close', $3)""",
-                            ctx.tenant_id, ctx.device_id, f"تم إغلاق اليوم - تقرير Z رقم {z_number}"
+                            ctx.tenant_id, ctx.device_id,
+                            f"تم إنهاء اليوم من {branch_name} - الساعة {time_str}",
                         )
             except Exception as e:
                 log.warning(f"Failed to send ZReport notification: {e}")
@@ -985,8 +998,12 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
             window_start_saudi = today_close_saudi
             window_end_saudi = today_close_saudi + timedelta(days=1)
 
-        # Auto-close is only relevant AFTER the close_hour has passed
-        auto_close_eligible = now_saudi >= today_close_saudi
+        # Auto-close fires ONLY within the grace window after close_hour (4 hours).
+        # Without this, if the agent was offline at close_hour and first connects at
+        # 3 PM, it would incorrectly trigger auto-close during business hours.
+        MAX_GRACE_HOURS = 4
+        grace_end_saudi = window_start_saudi + timedelta(hours=MAX_GRACE_HOURS)
+        auto_close_eligible = window_start_saudi <= now_saudi < grace_end_saudi
 
         if not auto_close_eligible:
             return {"auto_close": False}
@@ -1025,13 +1042,19 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
         if existing and existing > 0:
             return {"auto_close": False}
 
-        # Insert auto-close notification (matches portal wording exactly)
+        # Fetch branch name for notification
+        dev_row = await conn.fetchrow(
+            "SELECT branch_name FROM devices WHERE id=$1::uuid AND tenant_id=$2::uuid",
+            ctx.device_id, ctx.tenant_id,
+        )
+        branch_name = dev_row["branch_name"] if dev_row else "الفرع"
+
         await conn.execute(
             """INSERT INTO notifications
                (tenant_id, device_id, notification_type, message)
                VALUES ($1::uuid, $2::uuid, 'auto_close', $3)""",
             ctx.tenant_id, ctx.device_id,
-            "تم إنهاء اليوم من لوحة التحكم بشكل أوتوماتيكي وبداية يوم جديد",
+            f"تم إنهاء اليوم بشكل أوتوماتيكي من {branch_name}",
         )
         return {"auto_close": True}
 
