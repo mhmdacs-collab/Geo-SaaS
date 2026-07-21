@@ -490,6 +490,15 @@ async def _period_data(pool, tid, did, period):
             GROUP BY starting_cash_type
         """, tid, did)
 
+        # Treasury per branch (for accurate per-branch net profit)
+        branch_treasury_rows = await conn.fetch(f"""
+            SELECT device_id, starting_cash_type, COALESCE(SUM(amount), 0) AS total
+            FROM starting_cash
+            WHERE tenant_id = $1::uuid
+              AND DATE_TRUNC('{trunc}', date_created) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+            GROUP BY device_id, starting_cash_type
+        """, tid)
+
         # Dashboard QR purchase invoices (merged with Aronium purchases)
         try:
             qr_rows = await conn.fetch(f"""
@@ -530,14 +539,16 @@ async def _period_data(pool, tid, did, period):
         qr_purchase_count = int(qr_rows[0]["cnt"])
 
     # Build per-branch profit and VAT breakdown
+    _empty_branch = lambda: {"sales": 0.0, "refund": 0.0, "purchases": 0.0,
+                              "stock_return": 0.0, "tax_s": 0.0, "tax_r": 0.0, "tax_p": 0.0,
+                              "treasury_in": 0.0, "treasury_out": 0.0}
     _branch_map = {}
     _branch_names = {}
     for r in branch_rows:
         dev_id = str(r["device_id"])
         _branch_names[dev_id] = r["branch_name"]
         if dev_id not in _branch_map:
-            _branch_map[dev_id] = {"sales": 0.0, "refund": 0.0, "purchases": 0.0,
-                                    "stock_return": 0.0, "tax_s": 0.0, "tax_r": 0.0, "tax_p": 0.0}
+            _branch_map[dev_id] = _empty_branch()
         t = n(r["total"]); dt = r["document_type_id"]
         if dt == SALES: _branch_map[dev_id]["sales"] = t
         elif dt == REFUND: _branch_map[dev_id]["refund"] = abs(t)
@@ -546,22 +557,33 @@ async def _period_data(pool, tid, did, period):
     for r in branch_tax_rows:
         dev_id = str(r["device_id"])
         if dev_id not in _branch_map:
-            _branch_map[dev_id] = {"sales": 0.0, "refund": 0.0, "purchases": 0.0,
-                                    "stock_return": 0.0, "tax_s": 0.0, "tax_r": 0.0, "tax_p": 0.0}
+            _branch_map[dev_id] = _empty_branch()
         t = n(r["tax_total"]); dt = r["document_type_id"]
         if dt == SALES: _branch_map[dev_id]["tax_s"] = t
         elif dt == REFUND: _branch_map[dev_id]["tax_r"] = abs(t)
         elif dt == PURCHASE: _branch_map[dev_id]["tax_p"] = t
         elif dt == STOCK_RETURN: _branch_map[dev_id]["tax_p"] -= abs(t)
+    for r in branch_treasury_rows:
+        dev_id = str(r["device_id"])
+        if dev_id not in _branch_map:
+            _branch_map[dev_id] = _empty_branch()
+        t = n(r["total"])
+        if r["starting_cash_type"] == 0: _branch_map[dev_id]["treasury_in"] = t
+        elif r["starting_cash_type"] == 1: _branch_map[dev_id]["treasury_out"] = t
+    # Compute net_profit identical to individual branch view:
+    # net_income = net_sales + treasury_in
+    # net_expenses = (purchases - stock_return) + treasury_out
+    # net_profit = net_income - net_expenses
+    # vat_due = (tax_s - tax_r) - tax_p
     branch_breakdown = []
     for dev_id, b in _branch_map.items():
-        net_sales_b = b["sales"] - b["refund"]
-        net_purchases_b = b["purchases"] - b["stock_return"]
+        net_income_b = (b["sales"] - b["refund"]) + b["treasury_in"]
+        net_expenses_b = (b["purchases"] - b["stock_return"]) + b["treasury_out"]
         branch_breakdown.append({
             "device_id": dev_id,
             "branch_name": _branch_names.get(dev_id, ""),
             "total": round(b["sales"], 2),
-            "net_profit": round(net_sales_b - net_purchases_b, 2),
+            "net_profit": round(net_income_b - net_expenses_b, 2),
             "vat_due": round((b["tax_s"] - b["tax_r"]) - b["tax_p"], 2),
         })
     branch_breakdown.sort(key=lambda x: x["total"], reverse=True)
