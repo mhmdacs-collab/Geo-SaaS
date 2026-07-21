@@ -178,6 +178,39 @@ def _period_bounds(close_hour, offset=0):
     return close_utc + timedelta(days=offset), close_utc + timedelta(days=offset + 1)
 
 
+async def _z_period_bounds(conn, tid, did, close_hour, offset):
+    """
+    Period bounds using Z Report times for single-branch views.
+    offset=0  → current period: from last Z Report onward (open day)
+    offset=-1 → previous period: from 2nd-to-last Z Report to last Z Report
+    Falls back to _period_bounds if no Z Reports exist or did=None (all branches).
+    """
+    if not did:
+        return _period_bounds(close_hour, offset)
+
+    z_rows = await conn.fetch(
+        """SELECT date_created FROM z_report
+           WHERE tenant_id=$1::uuid AND device_id=$2::uuid
+           ORDER BY date_created DESC LIMIT 2""",
+        tid, did,
+    )
+
+    if not z_rows:
+        return _period_bounds(close_hour, offset)
+
+    last_z = z_rows[0]["date_created"]
+
+    if offset == 0:
+        # Current: everything after the last Z Report (open-ended, 2 days window)
+        return last_z, last_z + timedelta(days=2)
+    elif offset == -1:
+        # Previous: from the Z Report before last, up to last Z Report
+        prev_z = z_rows[1]["date_created"] if len(z_rows) >= 2 else last_z - timedelta(days=1)
+        return prev_z, last_z
+    else:
+        return _period_bounds(close_hour, offset)
+
+
 async def _get_auth(request):
     state = request.app.state
     return await _require_portal(
@@ -337,10 +370,10 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
     auth = await _get_auth(request)
     close_hour = int(auth.get("close_hour", 0))
     tid, did = _scope(auth, tenant_id)
-    start, end = _period_bounds(close_hour, offset)
     pool = state.pool
 
     async with pool.acquire() as conn:
+        start, end = await _z_period_bounds(conn, tid, did, close_hour, offset)
         rows = await conn.fetch("""
             SELECT document_type_id, COALESCE(SUM(total), 0) AS total, COUNT(*) AS cnt
             FROM document
@@ -893,10 +926,10 @@ async def portal_recent(request: Request, offset: int = 0, tenant_id: Optional[s
     auth = await _get_auth(request)
     close_hour = int(auth.get("close_hour", 0))
     tid, did = _scope(auth, tenant_id)
-    start, end = _period_bounds(close_hour, offset)
     pool = state.pool
 
     async with pool.acquire() as conn:
+        start, end = await _z_period_bounds(conn, tid, did, close_hour, offset)
         # Aronium documents: get last 20 within the period (day/yesterday)
         doc_rows = await conn.fetch("""
             SELECT d.id, d.document_type_id, d.number, d.date_created,

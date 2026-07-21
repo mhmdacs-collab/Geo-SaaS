@@ -1371,14 +1371,25 @@ function toggleNotifications() {
   }
 }
 
+var _seenDailyCloseIds = {};
+
 function fetchNotifications() {
   fetch(API + '/notifications?limit=50', {
     headers: apiHeaders()
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
-    renderNotifications(data.notifications || []);
-    updateNotificationBadge(data.notifications || []);
+    var notifs = data.notifications || [];
+    var hasNew = false;
+    notifs.forEach(function(n) {
+      if (n.type === 'daily_close' && !_seenDailyCloseIds[n.id]) {
+        _seenDailyCloseIds[n.id] = true;
+        hasNew = true;
+      }
+    });
+    renderNotifications(notifs);
+    updateNotificationBadge(notifs);
+    if (hasNew) refreshData();
   })
   .catch(function(err) {
     console.error('Failed to fetch notifications:', err);
