@@ -191,12 +191,15 @@ async def _z_period_bounds(conn, tid, did, close_hour, offset):
     if not did:
         return _period_bounds(close_hour, offset)
 
-    session_row = await conn.fetchrow(
-        """SELECT period_start, period_end FROM day_sessions
-           WHERE tenant_id=$1::uuid AND device_id=$2::uuid
-           ORDER BY period_end DESC LIMIT 1""",
-        tid, did,
-    )
+    try:
+        session_row = await conn.fetchrow(
+            """SELECT period_start, period_end FROM day_sessions
+               WHERE tenant_id=$1::uuid AND device_id=$2::uuid
+               ORDER BY period_end DESC LIMIT 1""",
+            tid, did,
+        )
+    except asyncpg.UndefinedTableError:
+        return _period_bounds(close_hour, offset)
 
     if not session_row:
         return _period_bounds(close_hour, offset)
