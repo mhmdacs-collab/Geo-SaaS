@@ -1206,14 +1206,21 @@ function saveOnboard() {
 }
 
 /* ── QUARTER SUBMISSION ── */
+function _quarterStorageKey() {
+  // Scope the key to the current branch so each branch has independent submission state
+  var branchPart = CURRENT_BRANCH || 'all';
+  return 'submittedQuarters_' + branchPart;
+}
+
 function markQuarterSubmitted(quarterLabel) {
   if (!confirm('هل أنت متأكد من تقديم الإقرار الضريبي للربع ' + quarterLabel + '؟')) return;
   
-  // Save submission status in localStorage
-  var submittedQuarters = JSON.parse(localStorage.getItem('submittedQuarters') || '[]');
+  // Save submission status in localStorage scoped to the current branch
+  var key = _quarterStorageKey();
+  var submittedQuarters = JSON.parse(localStorage.getItem(key) || '[]');
   if (submittedQuarters.indexOf(quarterLabel) === -1) {
     submittedQuarters.push(quarterLabel);
-    localStorage.setItem('submittedQuarters', JSON.stringify(submittedQuarters));
+    localStorage.setItem(key, JSON.stringify(submittedQuarters));
   }
   
   alert('تم تسجيل تقديم الإقرار بنجاح');
@@ -1221,7 +1228,8 @@ function markQuarterSubmitted(quarterLabel) {
 }
 
 function isQuarterSubmitted(quarterLabel) {
-  var submittedQuarters = JSON.parse(localStorage.getItem('submittedQuarters') || '[]');
+  var key = _quarterStorageKey();
+  var submittedQuarters = JSON.parse(localStorage.getItem(key) || '[]');
   return submittedQuarters.indexOf(quarterLabel) !== -1;
 }
 
