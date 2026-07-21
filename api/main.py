@@ -104,6 +104,24 @@ api_limiter = RateLimiter(max_requests=100, window_seconds=60)       # 100 reque
 sync_limiter = RateLimiter(max_requests=60, window_seconds=60)       # 60 sync requests per minute
 
 
+async def _ensure_day_sessions_table(conn: asyncpg.Connection) -> None:
+    await conn.execute(
+        """CREATE TABLE IF NOT EXISTS day_sessions (
+               id BIGSERIAL PRIMARY KEY,
+               tenant_id UUID NOT NULL,
+               device_id UUID NOT NULL,
+               period_start TIMESTAMPTZ NOT NULL,
+               period_end TIMESTAMPTZ NOT NULL,
+               source TEXT NOT NULL DEFAULT 'z_report',
+               created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+           )"""
+    )
+    await conn.execute(
+        """CREATE INDEX IF NOT EXISTS idx_day_sessions_device
+           ON day_sessions (tenant_id, device_id, period_end DESC)"""
+    )
+
+
 # ────────────────────────────────────────────────────────────────────────────
 # DB pool lifecycle
 # ────────────────────────────────────────────────────────────────────────────
@@ -834,7 +852,6 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
         )
 
     try:
-        new_z_numbers = []
         async with pool.acquire() as conn:
             async with conn.transaction():
                 rows_to_write = []
@@ -842,30 +859,13 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
                     values = list(_coerce_row(pg_cols, project_row(tdef, raw), pg_table))
                     rows_to_write.append((ctx.tenant_id, ctx.device_id, *values))
 
-                if req.table.lower() == "zreport":
-                    z_ids = [row[2] for row in rows_to_write if row[2] is not None]
-                    if z_ids:
-                        existing_z_ids = await conn.fetch(
-                            """
-                            SELECT id
-                            FROM z_report
-                            WHERE tenant_id=$1::uuid
-                              AND device_id=$2::uuid
-                              AND id = ANY($3::text[])
-                            """,
-                            ctx.tenant_id, ctx.device_id, z_ids,
-                        )
-                        existing_ids = {str(row["id"]) for row in existing_z_ids}
-                        new_z_numbers = [
-                            row[3] for row in rows_to_write
-                            if row[2] is not None and str(row[2]) not in existing_ids
-                        ]
+                is_z_report = req.table.lower() == "zreport"
+                if is_z_report:
+                    await _ensure_day_sessions_table(conn)
                 await conn.executemany(sql, rows_to_write)
-        
-        # Send notification + record day_session for ZReport (daily close)
-        if req.table.lower() == "zreport" and new_z_numbers:
-            try:
-                async with pool.acquire() as conn:
+
+                # Any received ZReport is treated as a close event.
+                if is_z_report and rows_to_write:
                     dev_row = await conn.fetchrow(
                         "SELECT branch_name FROM devices WHERE id=$1::uuid AND tenant_id=$2::uuid",
                         ctx.device_id, ctx.tenant_id,
@@ -879,6 +879,19 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
                     period_label = "صباحاً" if hour < 12 else "مساءً"
                     hour12 = hour % 12 or 12
                     time_str = f"{hour12:02d}:{minute:02d} {period_label}"
+
+                    # Ignore near-duplicate close events caused by rapid retries.
+                    recent_close = await conn.fetchval(
+                        """SELECT COUNT(*) FROM day_sessions
+                           WHERE tenant_id=$1::uuid
+                             AND device_id=$2::uuid
+                             AND source='z_report'
+                             AND period_end >= ($3::timestamptz - interval '120 seconds')
+                             AND period_end <= ($3::timestamptz + interval '120 seconds')""",
+                        ctx.tenant_id, ctx.device_id, now_utc,
+                    )
+                    if recent_close and recent_close > 0:
+                        return {"upserted": len(rows_to_write), "table": req.table}
 
                     # Determine period_start: end of the previous day_session
                     prev = await conn.fetchrow(
@@ -907,16 +920,13 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
                            VALUES ($1::uuid, $2::uuid, $3, $4, 'z_report')""",
                         ctx.tenant_id, ctx.device_id, period_start, now_utc,
                     )
-                    for z_number in new_z_numbers:
-                        await conn.execute(
-                            """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
-                               VALUES ($1::uuid, $2::uuid, 'daily_close', $3)""",
-                            ctx.tenant_id, ctx.device_id,
-                            f"تم إنهاء اليوم من {branch_name} - الساعة {time_str}",
-                        )
-            except Exception as e:
-                log.warning(f"Failed to send ZReport notification: {e}")
-        
+                    await conn.execute(
+                        """INSERT INTO notifications (tenant_id, device_id, notification_type, message)
+                           VALUES ($1::uuid, $2::uuid, 'daily_close', $3)""",
+                        ctx.tenant_id, ctx.device_id,
+                        f"تم إنهاء اليوم من {branch_name} - الساعة {time_str}",
+                    )
+
         return {"upserted": len(rows_to_write), "table": req.table}
     except Exception as e:
         log.error(f"Upsert error for {req.table}: {e}")
@@ -1000,6 +1010,7 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
     pool: asyncpg.Pool = app.state.pool
 
     async with pool.acquire() as conn:
+        await _ensure_day_sessions_table(conn)
         tenant = await conn.fetchrow(
             "SELECT close_hour, COALESCE(onboarded, false) AS onboarded FROM tenants WHERE id=$1::uuid",
             ctx.tenant_id,
