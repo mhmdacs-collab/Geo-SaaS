@@ -181,9 +181,19 @@ def _period_bounds(close_hour, offset=0):
 async def _z_period_bounds(conn, tid, did, close_hour, offset):
     """
     Period bounds using Z Report times for single-branch views.
-    offset=0  → current period: from last Z Report onward (open day)
-    offset=-1 → previous period: from 2nd-to-last Z Report to last Z Report
-    Falls back to _period_bounds if no Z Reports exist or did=None (all branches).
+
+    offset=0  → current (open) period: from last Z Report onward
+    offset=-1 → previous (closed) period: from start of current business day
+                to last Z Report — this equals exactly what was in "current"
+                before the Z Report arrived
+
+    If the 2nd-to-last Z Report is within 36 h of the last, it defines the
+    start of the previous period (consecutive closes). Otherwise we fall back
+    to the close_hour-based start of the current business day, which prevents
+    old test Z Reports from creating artificially wide windows.
+
+    Falls back entirely to _period_bounds for all-branches (did=None) or
+    when no Z Reports exist.
     """
     if not did:
         return _period_bounds(close_hour, offset)
@@ -201,12 +211,23 @@ async def _z_period_bounds(conn, tid, did, close_hour, offset):
     last_z = z_rows[0]["date_created"]
 
     if offset == 0:
-        # Current: everything after the last Z Report (open-ended, 2 days window)
+        # Current: everything after the last Z Report (open-ended, 2-day window)
         return last_z, last_z + timedelta(days=2)
+
     elif offset == -1:
-        # Previous: from the Z Report before last, up to last Z Report
-        prev_z = z_rows[1]["date_created"] if len(z_rows) >= 2 else last_z - timedelta(days=1)
+        # Previous: the session that just ended
+        if len(z_rows) >= 2:
+            prev_z = z_rows[1]["date_created"]
+            # If the gap is >36 h the second Z Report is from a different
+            # cycle (e.g. an old test run).  Use the close_hour-based start of
+            # today's business day so we only show the current session's data.
+            if (last_z - prev_z) > timedelta(hours=36):
+                prev_z, _ = _period_bounds(close_hour, 0)
+        else:
+            # Only one Z Report ever — use the close_hour-based business-day start
+            prev_z, _ = _period_bounds(close_hour, 0)
         return prev_z, last_z
+
     else:
         return _period_bounds(close_hour, offset)
 
