@@ -104,24 +104,6 @@ api_limiter = RateLimiter(max_requests=100, window_seconds=60)       # 100 reque
 sync_limiter = RateLimiter(max_requests=60, window_seconds=60)       # 60 sync requests per minute
 
 
-async def _ensure_day_sessions_table(conn: asyncpg.Connection) -> None:
-    await conn.execute(
-        """CREATE TABLE IF NOT EXISTS day_sessions (
-               id BIGSERIAL PRIMARY KEY,
-               tenant_id UUID NOT NULL,
-               device_id UUID NOT NULL,
-               period_start TIMESTAMPTZ NOT NULL,
-               period_end TIMESTAMPTZ NOT NULL,
-               source TEXT NOT NULL DEFAULT 'z_report',
-               created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-           )"""
-    )
-    await conn.execute(
-        """CREATE INDEX IF NOT EXISTS idx_day_sessions_device
-           ON day_sessions (tenant_id, device_id, period_end DESC)"""
-    )
-
-
 # ────────────────────────────────────────────────────────────────────────────
 # DB pool lifecycle
 # ────────────────────────────────────────────────────────────────────────────
@@ -860,8 +842,6 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
                     rows_to_write.append((ctx.tenant_id, ctx.device_id, *values))
 
                 is_z_report = req.table.lower() == "zreport"
-                if is_z_report:
-                    await _ensure_day_sessions_table(conn)
                 await conn.executemany(sql, rows_to_write)
 
                 # Any received ZReport is treated as a close event.
@@ -1010,7 +990,6 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
     pool: asyncpg.Pool = app.state.pool
 
     async with pool.acquire() as conn:
-        await _ensure_day_sessions_table(conn)
         tenant = await conn.fetchrow(
             "SELECT close_hour, COALESCE(onboarded, false) AS onboarded FROM tenants WHERE id=$1::uuid",
             ctx.tenant_id,
