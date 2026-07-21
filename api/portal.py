@@ -419,6 +419,84 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
     }
 
 
+async def _branch_metrics(conn, tid, dev_id, trunc):
+    """Compute net_profit and vat_due for one branch — same queries as individual branch view."""
+    rows = await conn.fetch(f"""
+        SELECT document_type_id, COALESCE(SUM(total), 0) AS total
+        FROM document
+        WHERE tenant_id = $1::uuid AND device_id = $2::uuid
+          AND DATE_TRUNC('{trunc}', doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+          AND document_type_id = ANY($3::text[])
+        GROUP BY document_type_id
+    """, tid, dev_id, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+
+    tax_rows = await conn.fetch(f"""
+        SELECT d.document_type_id, COALESCE(SUM(dt.amount), 0) AS tax_total
+        FROM document_item_tax dt
+        JOIN document_item di ON di.id = dt.document_item_id
+          AND di.tenant_id = dt.tenant_id AND di.device_id = dt.device_id
+        JOIN document d ON d.id = di.document_id
+          AND d.tenant_id = di.tenant_id AND d.device_id = di.device_id
+        WHERE dt.tenant_id = $1::uuid AND dt.device_id = $2::uuid
+          AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+          AND d.document_type_id = ANY($3::text[])
+        GROUP BY d.document_type_id
+    """, tid, dev_id, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+
+    treasury_rows = await conn.fetch(f"""
+        SELECT starting_cash_type, COALESCE(SUM(amount), 0) AS total
+        FROM starting_cash
+        WHERE tenant_id = $1::uuid AND device_id = $2::uuid
+          AND DATE_TRUNC('{trunc}', date_created) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+        GROUP BY starting_cash_type
+    """, tid, dev_id)
+
+    try:
+        qr_rows = await conn.fetch(f"""
+            SELECT COALESCE(SUM(total_amount), 0) AS total,
+                   COALESCE(SUM(vat_amount), 0) AS vat_total
+            FROM dashboard_purchase_invoice
+            WHERE tenant_id = $1::uuid AND device_id = $2::uuid
+              AND DATE_TRUNC('{trunc}', issued_at::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+        """, tid, dev_id)
+    except Exception:
+        qr_rows = []
+
+    sales = refund = purchases = stock_return = 0.0
+    tax_s = tax_r = tax_p = treasury_in = treasury_out = 0.0
+
+    for r in rows:
+        t = n(r["total"]); dt = r["document_type_id"]
+        if dt == SALES: sales = t
+        elif dt == REFUND: refund = abs(t)
+        elif dt == PURCHASE: purchases = t
+        elif dt == STOCK_RETURN: stock_return = abs(t)
+
+    for r in tax_rows:
+        t = n(r["tax_total"]); dt = r["document_type_id"]
+        if dt == SALES: tax_s = t
+        elif dt == REFUND: tax_r = abs(t)
+        elif dt == PURCHASE: tax_p = t
+        elif dt == STOCK_RETURN: tax_p -= abs(t)
+
+    for r in treasury_rows:
+        t = n(r["total"])
+        if r["starting_cash_type"] == 0: treasury_in = t
+        elif r["starting_cash_type"] == 1: treasury_out = t
+
+    if qr_rows:
+        purchases += n(qr_rows[0]["total"])
+        tax_p += n(qr_rows[0]["vat_total"])
+
+    net_income = (sales - refund) + treasury_in
+    net_expenses = (purchases - stock_return) + treasury_out
+    return {
+        "total_sales": round(sales, 2),
+        "net_profit": round(net_income - net_expenses, 2),
+        "vat_due": round((tax_s - tax_r) - tax_p, 2),
+    }
+
+
 # === MONTH / QUARTER ===
 async def _period_data(pool, tid, did, period):
     trunc = "month" if period == "month" else "quarter"
@@ -458,29 +536,6 @@ async def _period_data(pool, tid, did, period):
             GROUP BY pt.name
         """, tid, did, SALES, REFUND, [SALES, REFUND])
 
-        branch_rows = await conn.fetch(f"""
-            SELECT d.device_id, dev.branch_name, d.document_type_id,
-                   COALESCE(SUM(d.total), 0) AS total
-            FROM document d
-            JOIN devices dev ON dev.id = d.device_id
-            WHERE d.tenant_id = $1::uuid
-              AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-              AND d.document_type_id = ANY($2::text[])
-            GROUP BY d.device_id, dev.branch_name, d.document_type_id
-        """, tid, [SALES, REFUND, PURCHASE, STOCK_RETURN])
-
-        branch_tax_rows = await conn.fetch(f"""
-            SELECT d.device_id, d.document_type_id,
-                   COALESCE(SUM(dt.amount), 0) AS tax_total
-            FROM document_item_tax dt
-            JOIN document_item di ON di.id = dt.document_item_id AND di.tenant_id = dt.tenant_id AND di.device_id = dt.device_id
-            JOIN document d ON d.id = di.document_id AND d.tenant_id = di.tenant_id AND d.device_id = di.device_id
-            WHERE dt.tenant_id = $1::uuid
-              AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-              AND d.document_type_id = ANY($2::text[])
-            GROUP BY d.device_id, d.document_type_id
-        """, tid, [SALES, REFUND, PURCHASE, STOCK_RETURN])
-
         # Treasury: starting_cash (0=income, 1=expense)
         treasury_rows = await conn.fetch(f"""
             SELECT starting_cash_type, COALESCE(SUM(amount), 0) AS total
@@ -489,15 +544,6 @@ async def _period_data(pool, tid, did, period):
               AND DATE_TRUNC('{trunc}', date_created) = DATE_TRUNC('{trunc}', CURRENT_DATE)
             GROUP BY starting_cash_type
         """, tid, did)
-
-        # Treasury per branch (for accurate per-branch net profit)
-        branch_treasury_rows = await conn.fetch(f"""
-            SELECT device_id, starting_cash_type, COALESCE(SUM(amount), 0) AS total
-            FROM starting_cash
-            WHERE tenant_id = $1::uuid
-              AND DATE_TRUNC('{trunc}', date_created) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-            GROUP BY device_id, starting_cash_type
-        """, tid)
 
         # Dashboard QR purchase invoices (merged with Aronium purchases)
         try:
@@ -510,6 +556,24 @@ async def _period_data(pool, tid, did, period):
             """, tid, did)
         except Exception:
             qr_rows = []
+
+        # Branch breakdown — call the exact same per-branch queries used by individual branch views
+        device_rows = await conn.fetch("""
+            SELECT id, branch_name FROM devices WHERE tenant_id = $1::uuid ORDER BY branch_name
+        """, tid)
+
+        branch_breakdown = []
+        for dev_row in device_rows:
+            dev_id = dev_row["id"]
+            bm = await _branch_metrics(conn, tid, dev_id, trunc)
+            branch_breakdown.append({
+                "device_id": str(dev_id),
+                "branch_name": dev_row["branch_name"],
+                "total": bm["total_sales"],
+                "net_profit": bm["net_profit"],
+                "vat_due": bm["vat_due"],
+            })
+        branch_breakdown.sort(key=lambda x: x["total"], reverse=True)
 
     sales = refund = purchases = stock_return = 0.0
     tax_s = tax_r = tax_p = 0.0
@@ -537,56 +601,6 @@ async def _period_data(pool, tid, did, period):
         purchases += n(qr_rows[0]["total"])
         tax_p += n(qr_rows[0]["vat_total"])
         qr_purchase_count = int(qr_rows[0]["cnt"])
-
-    # Build per-branch profit and VAT breakdown
-    _empty_branch = lambda: {"sales": 0.0, "refund": 0.0, "purchases": 0.0,
-                              "stock_return": 0.0, "tax_s": 0.0, "tax_r": 0.0, "tax_p": 0.0,
-                              "treasury_in": 0.0, "treasury_out": 0.0}
-    _branch_map = {}
-    _branch_names = {}
-    for r in branch_rows:
-        dev_id = str(r["device_id"])
-        _branch_names[dev_id] = r["branch_name"]
-        if dev_id not in _branch_map:
-            _branch_map[dev_id] = _empty_branch()
-        t = n(r["total"]); dt = r["document_type_id"]
-        if dt == SALES: _branch_map[dev_id]["sales"] = t
-        elif dt == REFUND: _branch_map[dev_id]["refund"] = abs(t)
-        elif dt == PURCHASE: _branch_map[dev_id]["purchases"] = t
-        elif dt == STOCK_RETURN: _branch_map[dev_id]["stock_return"] = abs(t)
-    for r in branch_tax_rows:
-        dev_id = str(r["device_id"])
-        if dev_id not in _branch_map:
-            _branch_map[dev_id] = _empty_branch()
-        t = n(r["tax_total"]); dt = r["document_type_id"]
-        if dt == SALES: _branch_map[dev_id]["tax_s"] = t
-        elif dt == REFUND: _branch_map[dev_id]["tax_r"] = abs(t)
-        elif dt == PURCHASE: _branch_map[dev_id]["tax_p"] = t
-        elif dt == STOCK_RETURN: _branch_map[dev_id]["tax_p"] -= abs(t)
-    for r in branch_treasury_rows:
-        dev_id = str(r["device_id"])
-        if dev_id not in _branch_map:
-            _branch_map[dev_id] = _empty_branch()
-        t = n(r["total"])
-        if r["starting_cash_type"] == 0: _branch_map[dev_id]["treasury_in"] = t
-        elif r["starting_cash_type"] == 1: _branch_map[dev_id]["treasury_out"] = t
-    # Compute net_profit identical to individual branch view:
-    # net_income = net_sales + treasury_in
-    # net_expenses = (purchases - stock_return) + treasury_out
-    # net_profit = net_income - net_expenses
-    # vat_due = (tax_s - tax_r) - tax_p
-    branch_breakdown = []
-    for dev_id, b in _branch_map.items():
-        net_income_b = (b["sales"] - b["refund"]) + b["treasury_in"]
-        net_expenses_b = (b["purchases"] - b["stock_return"]) + b["treasury_out"]
-        branch_breakdown.append({
-            "device_id": dev_id,
-            "branch_name": _branch_names.get(dev_id, ""),
-            "total": round(b["sales"], 2),
-            "net_profit": round(net_income_b - net_expenses_b, 2),
-            "vat_due": round((b["tax_s"] - b["tax_r"]) - b["tax_p"], 2),
-        })
-    branch_breakdown.sort(key=lambda x: x["total"], reverse=True)
 
     q_label = ""; progress = days_remaining = 0
     if period == "quarter":
