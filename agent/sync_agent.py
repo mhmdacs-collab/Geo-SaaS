@@ -235,6 +235,18 @@ def _cursor_set(table: str, last_updated_at: str) -> None:
     conn.close()
 
 
+def _cursor_pk_get(table: str) -> int:
+    raw = _kv_get(f"cursor_pk:{table}", "0")
+    try:
+        return int(raw or "0")
+    except Exception:
+        return 0
+
+
+def _cursor_pk_set(table: str, last_pk: int) -> None:
+    _kv_set(f"cursor_pk:{table}", str(int(last_pk)))
+
+
 def _hash_lookup(table: str) -> Dict[str, str]:
     conn = sqlite3.connect(STATE_DB)
     rows = conn.execute(
@@ -616,18 +628,26 @@ def _sync_incremental_updated(snap, api, table, batch_size):
     cols = table["cols"]
     updated_col = table["updated_col"]
     cursor = _cursor_get(name) or "1970-01-01 00:00:00"
+    cursor_pk = _cursor_pk_get(name)
     col_list = ", ".join(f'"{c}"' for c in cols)
     rows = snap.execute(
-        f'SELECT {col_list} FROM "{name}" WHERE "{updated_col}" > ? ORDER BY "{updated_col}" ASC LIMIT ?',
-        (cursor, batch_size),
+        f'''SELECT {col_list}
+            FROM "{name}"
+            WHERE ("{updated_col}" > ?)
+               OR ("{updated_col}" = ? AND "Id" > ?)
+            ORDER BY "{updated_col}" ASC, "Id" ASC
+            LIMIT ?''',
+        (cursor, cursor, cursor_pk, batch_size),
     ).fetchall()
     if not rows:
         return 0
     payload = [_row_to_dict(r, cols) for r in rows]
     api.upsert(name, payload)
-    new_cursor = max(str(r[updated_col]) for r in rows if r[updated_col] is not None)
+    last_row = rows[-1]
+    new_cursor = str(last_row[updated_col]) if last_row[updated_col] is not None else None
     if new_cursor:
         _cursor_set(name, new_cursor)
+        _cursor_pk_set(name, int(last_row["Id"]))
     logger.info(LOG["table_inc"].format(count=len(payload), table=name))
     return len(payload)
 
@@ -637,11 +657,17 @@ def _sync_z_report_with_summary(snap, api, table, batch_size):
     name = table["name"]
     updated_col = table["updated_col"]
     cursor = _cursor_get(name) or _kv_get("registered_at") or "1970-01-01 00:00:00"
+    cursor_pk = _cursor_pk_get(name)
     
     # Get new ZReports
     z_reports = snap.execute(
-        f'SELECT Id, Number, FromDocumentId, ToDocumentId, DateCreated FROM "{name}" WHERE "{updated_col}" > ? ORDER BY "{updated_col}" ASC LIMIT ?',
-        (cursor, batch_size),
+        f'''SELECT Id, Number, FromDocumentId, ToDocumentId, DateCreated
+            FROM "{name}"
+            WHERE ("{updated_col}" > ?)
+               OR ("{updated_col}" = ? AND "Id" > ?)
+            ORDER BY "{updated_col}" ASC, "Id" ASC
+            LIMIT ?''',
+        (cursor, cursor, cursor_pk, batch_size),
     ).fetchall()
     
     if not z_reports:
@@ -720,9 +746,11 @@ def _sync_z_report_with_summary(snap, api, table, batch_size):
         })
     
     api.upsert(name, payload)
-    new_cursor = max(str(z[4]) for z in z_reports if z[4] is not None)
+    last_z = z_reports[-1]
+    new_cursor = str(last_z[4]) if last_z[4] is not None else None
     if new_cursor:
         _cursor_set(name, new_cursor)
+        _cursor_pk_set(name, int(last_z[0]))
     logger.info(LOG["table_inc"].format(count=len(payload), table=name))
     return len(payload)
 
@@ -775,9 +803,14 @@ def _sync_child_of(snap, api, table, parent_changed_ids):
     return total
 
 
-def _collect_parent_ids_since(snap, parent_table, cursor_value):
+def _collect_parent_ids_since(snap, parent_table, cursor_value, cursor_pk=0):
     rows = snap.execute(
-        f'SELECT "Id" FROM "{parent_table}" WHERE "DateUpdated" > ?', (cursor_value,)
+        f'''SELECT "Id"
+            FROM "{parent_table}"
+            WHERE ("DateUpdated" > ?)
+               OR ("DateUpdated" = ? AND "Id" > ?)
+            ORDER BY "DateUpdated" ASC, "Id" ASC''',
+        (cursor_value, cursor_value, cursor_pk),
     ).fetchall()
     return [r[0] for r in rows]
 
@@ -911,6 +944,7 @@ def ensure_activated(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
             if table["strategy"] in ("incremental_updated", "z_report_with_summary"):
                 if not _cursor_get(table["name"]):
                     _cursor_set(table["name"], registered_at)
+                    _cursor_pk_set(table["name"], 0)
 
 
 # ─── Sync Cycle ──────────────────────────────────────────────────────────────
@@ -925,6 +959,7 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
     
     try:
         parent_cursor_before_doc = _cursor_get("Document") or "1970-01-01 00:00:00"
+        parent_cursor_pk_before_doc = _cursor_pk_get("Document")
 
         for table in SYNC_MAP:
             strategy = table["strategy"]
@@ -944,9 +979,13 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
                     parent_table = table["parent_table"]
                     parent_fk = table.get("parent_fk", f"{parent_table}Id")
                     if parent_table == "Document":
-                        parent_ids = _collect_parent_ids_since(conn, "Document", parent_cursor_before_doc)
+                        parent_ids = _collect_parent_ids_since(
+                            conn, "Document", parent_cursor_before_doc, parent_cursor_pk_before_doc
+                        )
                     elif parent_table == "DocumentItem":
-                        doc_ids = _collect_parent_ids_since(conn, "Document", parent_cursor_before_doc)
+                        doc_ids = _collect_parent_ids_since(
+                            conn, "Document", parent_cursor_before_doc, parent_cursor_pk_before_doc
+                        )
                         if not doc_ids:
                             parent_ids = []
                         else:
@@ -960,7 +999,8 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
                             ]
                     elif parent_table == "PosOrder":
                         pos_cursor = _cursor_get("PosOrder") or "1970-01-01 00:00:00"
-                        parent_ids = _collect_parent_ids_since(conn, "PosOrder", pos_cursor)
+                        pos_cursor_pk = _cursor_pk_get("PosOrder")
+                        parent_ids = _collect_parent_ids_since(conn, "PosOrder", pos_cursor, pos_cursor_pk)
                     else:
                         parent_ids = []
                     n = _sync_child_of(conn, api, table, parent_ids)
