@@ -172,6 +172,7 @@ button,input,select{font-family:inherit}
 .sync-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:var(--rs);font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px}
 .sync-btn:hover{border-color:var(--brand);color:var(--brand-d)}
 .sync-btn svg{width:11px;height:11px}
+.sync-health-slot{margin-bottom:14px}
 
 /* ── NOTIFICATIONS ── */
 .notif-btn{position:relative;background:none;border:none;cursor:pointer;padding:8px;border-radius:50%;transition:var(--tr)}
@@ -435,6 +436,7 @@ button,input,select{font-family:inherit}
           تحديث
         </button>
       </div>
+      <div id="syncHealthSlot" class="sync-health-slot"></div>
 
       <div id="subBannerCard" style="display:none"></div>
 
@@ -783,6 +785,7 @@ function loadSyncStatus() {
   if (SUB_EXP && new Date(SUB_EXP) < new Date()) {
     var si = document.getElementById('syncInfo');
     if (si) si.textContent = 'المزامنة متوقفة — انتهى الاشتراك';
+    renderSyncHealthUnderBar(LAST_SYNC_STATUS || {});
     return;
   }
   fetch(API + '/sync-status' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
@@ -795,6 +798,7 @@ function loadSyncStatus() {
       dateStr = dt.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Riyadh'}) + ' ' + dt.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh'});
     }
     document.getElementById('syncInfo').textContent = 'آخر مزامنة: ' + dateStr;
+    renderSyncHealthUnderBar(d);
     if (currentTab === 'today' || currentTab === 'yesterday' || currentTab === 'month') {
       loadTabData();
     }
@@ -842,6 +846,12 @@ function renderSyncHealthPanel(sync) {
   return html;
 }
 
+function renderSyncHealthUnderBar(sync) {
+  var slot = document.getElementById('syncHealthSlot');
+  if (!slot) return;
+  slot.innerHTML = renderSyncHealthPanel(sync || {});
+}
+
 function renderDayData(d, recent, prev) {
   var html = '';
   var prevData = prev || {};
@@ -867,8 +877,6 @@ function renderDayData(d, recent, prev) {
     + metricCard('mc-s', 'وارد الخزينة', fmt(d.treasury_in), trendFoot(d.treasury_in, prevData.treasury_in), incomeIcon())
     + metricCard('mc-r', 'مصروف الخزينة', fmt(d.treasury_out), trendFoot(d.treasury_out, prevData.treasury_out), expenseIcon())
     + '</div>';
-
-  html += renderSyncHealthPanel(LAST_SYNC_STATUS);
 
   // 4. قنوات الدفع
   html += renderPaymentsPanel(d.payment_breakdown);
@@ -905,8 +913,6 @@ function renderMonthData(d) {
   html += '<div class="mgrid">'
     + metricCard(profitCls + ' mc-full', 'صافي الربح', fmt(net_profit), trendFoot(net_profit, prev_profit), netIcon())
     + '</div>';
-
-  html += renderSyncHealthPanel(LAST_SYNC_STATUS);
 
   // 4. قنوات الدفع
   html += renderPaymentsPanel(cur.payment_breakdown);
