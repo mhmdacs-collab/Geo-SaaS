@@ -847,10 +847,13 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
                 # Any received ZReport is treated as a close event.
                 if is_z_report and rows_to_write:
                     dev_row = await conn.fetchrow(
-                        "SELECT branch_name FROM devices WHERE id=$1::uuid AND tenant_id=$2::uuid",
+                        """SELECT branch_name, registered_at
+                           FROM devices
+                           WHERE id=$1::uuid AND tenant_id=$2::uuid""",
                         ctx.device_id, ctx.tenant_id,
                     )
                     branch_name = dev_row["branch_name"] if dev_row else "الفرع"
+                    registered_at = dev_row["registered_at"] if dev_row else None
                     saudi = timezone(timedelta(hours=3))
                     now_utc = datetime.now(timezone.utc)
                     now_saudi = now_utc.astimezone(saudi)
@@ -859,6 +862,18 @@ async def upsert(req: UpsertReq, ctx: AgentCtx = Depends(require_agent), request
                     period_label = "صباحاً" if hour < 12 else "مساءً"
                     hour12 = hour % 12 or 12
                     time_str = f"{hour12:02d}:{minute:02d} {period_label}"
+
+                    # Baseline guard: ignore historical ZReport rows that are older
+                    # than this device registration time, so first activation starts
+                    # from "now" without creating historical close events.
+                    if registered_at:
+                        incoming_z_dates = []
+                        for row in rows_to_write:
+                            dt = _to_datetime(row[6])
+                            if dt:
+                                incoming_z_dates.append(dt)
+                        if incoming_z_dates and max(incoming_z_dates) < registered_at:
+                            return {"upserted": len(rows_to_write), "table": req.table}
 
                     # Ignore near-duplicate close events caused by rapid retries.
                     recent_close = await conn.fetchval(

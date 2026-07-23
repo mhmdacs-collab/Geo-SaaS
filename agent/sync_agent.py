@@ -536,7 +536,7 @@ def _sync_z_report_with_summary(snap, api, table, batch_size):
     """Sync ZReport with calculated summaries from Document/Payment tables."""
     name = table["name"]
     updated_col = table["updated_col"]
-    cursor = _cursor_get(name) or "1970-01-01 00:00:00"
+    cursor = _cursor_get(name) or _kv_get("registered_at") or "1970-01-01 00:00:00"
     
     # Get new ZReports
     z_reports = snap.execute(
@@ -808,7 +808,7 @@ def ensure_activated(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
         _kv_set("registered_at", registered_at)
         # Set initial cursors for incremental tables
         for table in SYNC_MAP:
-            if table["strategy"] == "incremental_updated":
+            if table["strategy"] in ("incremental_updated", "z_report_with_summary"):
                 if not _cursor_get(table["name"]):
                     _cursor_set(table["name"], registered_at)
 
