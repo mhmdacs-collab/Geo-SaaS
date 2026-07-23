@@ -46,7 +46,11 @@ if _admin_keys_env:
 else:
     _single_admin = os.environ.get("ADMIN_API_KEY", "").strip()
     ADMIN_API_KEYS = [_single_admin] if _single_admin else []
-CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
+_cors_env = os.environ.get("CORS_ORIGINS", "").strip()
+if _cors_env:
+    CORS_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]
+else:
+    CORS_ORIGINS = ["*"]
 JWT_TTL_DAYS = int(os.environ.get("JWT_TTL_DAYS", "30"))  # Reduced from 365 to 30 days
 SUPPORT_WA = os.environ.get("SUPPORT_WA", "966558110150")
 
@@ -118,6 +122,8 @@ async def lifespan(app: FastAPI):
     app.state.jwt_alg = JWT_ALG
     app.state.admin_api_keys = ADMIN_API_KEYS
     app.state.support_wa = SUPPORT_WA
+    if CORS_ORIGINS == ["*"]:
+        log.warning("CORS_ORIGINS is wildcard; set explicit dashboard origins in production")
     log.info("DB pool ready")
     try:
         yield

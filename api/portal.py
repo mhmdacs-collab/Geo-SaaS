@@ -460,16 +460,17 @@ async def portal_day(request: Request, offset: int = 0, tenant_id: Optional[str]
     }
 
 
-async def _branch_metrics(conn, tid, dev_id, trunc):
+async def _branch_metrics(conn, tid, dev_id, trunc, anchor_date: Optional[date] = None):
     """Compute net_profit and vat_due for one branch — same queries as individual branch view."""
+    ref_date = anchor_date or date.today()
     rows = await conn.fetch(f"""
         SELECT document_type_id, COALESCE(SUM(total), 0) AS total
         FROM document
         WHERE tenant_id = $1::uuid AND device_id = $2::uuid
-          AND DATE_TRUNC('{trunc}', doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+          AND DATE_TRUNC('{trunc}', doc_date::date) = DATE_TRUNC('{trunc}', $4::date)
           AND document_type_id = ANY($3::text[])
         GROUP BY document_type_id
-    """, tid, dev_id, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+    """, tid, dev_id, [SALES, REFUND, PURCHASE, STOCK_RETURN], ref_date)
 
     tax_rows = await conn.fetch(f"""
         SELECT d.document_type_id, COALESCE(SUM(dt.amount), 0) AS tax_total
@@ -479,18 +480,18 @@ async def _branch_metrics(conn, tid, dev_id, trunc):
         JOIN document d ON d.id = di.document_id
           AND d.tenant_id = di.tenant_id AND d.device_id = di.device_id
         WHERE dt.tenant_id = $1::uuid AND dt.device_id = $2::uuid
-          AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+          AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', $4::date)
           AND d.document_type_id = ANY($3::text[])
         GROUP BY d.document_type_id
-    """, tid, dev_id, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+    """, tid, dev_id, [SALES, REFUND, PURCHASE, STOCK_RETURN], ref_date)
 
     treasury_rows = await conn.fetch(f"""
         SELECT starting_cash_type, COALESCE(SUM(amount), 0) AS total
         FROM starting_cash
         WHERE tenant_id = $1::uuid AND device_id = $2::uuid
-          AND DATE_TRUNC('{trunc}', date_created) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+          AND DATE_TRUNC('{trunc}', date_created) = DATE_TRUNC('{trunc}', $3::date)
         GROUP BY starting_cash_type
-    """, tid, dev_id)
+    """, tid, dev_id, ref_date)
 
     try:
         qr_rows = await conn.fetch(f"""
@@ -498,8 +499,8 @@ async def _branch_metrics(conn, tid, dev_id, trunc):
                    COALESCE(SUM(vat_amount), 0) AS vat_total
             FROM dashboard_purchase_invoice
             WHERE tenant_id = $1::uuid AND device_id = $2::uuid
-              AND DATE_TRUNC('{trunc}', issued_at::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-        """, tid, dev_id)
+              AND DATE_TRUNC('{trunc}', issued_at::date) = DATE_TRUNC('{trunc}', $3::date)
+        """, tid, dev_id, ref_date)
     except Exception:
         qr_rows = []
 
@@ -539,17 +540,18 @@ async def _branch_metrics(conn, tid, dev_id, trunc):
 
 
 # === MONTH / QUARTER ===
-async def _period_data(pool, tid, did, period):
+async def _period_data(pool, tid, did, period, anchor_date: Optional[date] = None):
     trunc = "month" if period == "month" else "quarter"
+    ref_date = anchor_date or date.today()
     async with pool.acquire() as conn:
         rows = await conn.fetch(f"""
             SELECT document_type_id, COALESCE(SUM(total), 0) AS total, COUNT(*) AS cnt
             FROM document
             WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-              AND DATE_TRUNC('{trunc}', doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+              AND DATE_TRUNC('{trunc}', doc_date::date) = DATE_TRUNC('{trunc}', $4::date)
               AND document_type_id = ANY($3::text[])
             GROUP BY document_type_id
-        """, tid, did, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+        """, tid, did, [SALES, REFUND, PURCHASE, STOCK_RETURN], ref_date)
 
         tax_rows = await conn.fetch(f"""
             SELECT d.document_type_id, COALESCE(SUM(dt.amount), 0) AS tax_total
@@ -557,10 +559,10 @@ async def _period_data(pool, tid, did, period):
             JOIN document_item di ON di.id = dt.document_item_id AND di.tenant_id = dt.tenant_id AND di.device_id = dt.device_id
             JOIN document d ON d.id = di.document_id AND d.tenant_id = di.tenant_id AND d.device_id = di.device_id
             WHERE dt.tenant_id = $1::uuid AND ($2::uuid IS NULL OR dt.device_id = $2::uuid)
-              AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+              AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', $4::date)
               AND d.document_type_id = ANY($3::text[])
             GROUP BY d.document_type_id
-        """, tid, did, [SALES, REFUND, PURCHASE, STOCK_RETURN])
+        """, tid, did, [SALES, REFUND, PURCHASE, STOCK_RETURN], ref_date)
 
         pay_rows = await conn.fetch(f"""
             SELECT pt.name AS pay_name, COALESCE(SUM(
@@ -572,19 +574,19 @@ async def _period_data(pool, tid, did, period):
             JOIN document d ON d.id = p.document_id AND d.tenant_id = p.tenant_id AND d.device_id = p.device_id
             JOIN payment_type pt ON pt.id = p.payment_type_id AND pt.tenant_id = p.tenant_id AND pt.device_id = p.device_id
             WHERE p.tenant_id = $1::uuid AND ($2::uuid IS NULL OR p.device_id = $2::uuid)
-              AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+              AND DATE_TRUNC('{trunc}', d.doc_date::date) = DATE_TRUNC('{trunc}', $6::date)
               AND d.document_type_id = ANY($5::text[])
             GROUP BY pt.name
-        """, tid, did, SALES, REFUND, [SALES, REFUND])
+        """, tid, did, SALES, REFUND, [SALES, REFUND], ref_date)
 
         # Treasury: starting_cash (0=income, 1=expense)
         treasury_rows = await conn.fetch(f"""
             SELECT starting_cash_type, COALESCE(SUM(amount), 0) AS total
             FROM starting_cash
             WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-              AND DATE_TRUNC('{trunc}', date_created) = DATE_TRUNC('{trunc}', CURRENT_DATE)
+              AND DATE_TRUNC('{trunc}', date_created) = DATE_TRUNC('{trunc}', $3::date)
             GROUP BY starting_cash_type
-        """, tid, did)
+        """, tid, did, ref_date)
 
         # Dashboard QR purchase invoices (merged with Aronium purchases)
         try:
@@ -593,8 +595,8 @@ async def _period_data(pool, tid, did, period):
                        COALESCE(SUM(vat_amount), 0) AS vat_total
                 FROM dashboard_purchase_invoice
                 WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR device_id = $2::uuid)
-                  AND DATE_TRUNC('{trunc}', issued_at::date) = DATE_TRUNC('{trunc}', CURRENT_DATE)
-            """, tid, did)
+                  AND DATE_TRUNC('{trunc}', issued_at::date) = DATE_TRUNC('{trunc}', $3::date)
+            """, tid, did, ref_date)
         except Exception:
             qr_rows = []
 
@@ -606,7 +608,7 @@ async def _period_data(pool, tid, did, period):
         branch_breakdown = []
         for dev_row in device_rows:
             dev_id = dev_row["id"]
-            bm = await _branch_metrics(conn, tid, dev_id, trunc)
+            bm = await _branch_metrics(conn, tid, dev_id, trunc, ref_date)
             branch_breakdown.append({
                 "device_id": str(dev_id),
                 "branch_name": dev_row["branch_name"],
@@ -679,6 +681,13 @@ async def _period_data(pool, tid, did, period):
         "purchase_invoice_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == PURCHASE) + qr_purchase_count,
         "stock_return_count": sum(int(r["cnt"]) for r in rows if r["document_type_id"] == STOCK_RETURN),
     }
+
+
+def _shift_month(base: date, months: int) -> date:
+    idx = (base.year * 12 + (base.month - 1)) + months
+    year = idx // 12
+    month = (idx % 12) + 1
+    return date(year, month, 1)
 
 
 async def _period_data_for_dates(pool, tid, did, start_date, end_date):
@@ -757,6 +766,17 @@ async def portal_month(request: Request, tenant_id: Optional[str] = None):
     auth = await _get_auth(request)
     tid, did = _scope(auth, tenant_id)
     return await _period_data(request.app.state.pool, tid, did, "month")
+
+
+@router.get("/month-compare")
+async def portal_month_compare(request: Request, tenant_id: Optional[str] = None):
+    auth = await _get_auth(request)
+    tid, did = _scope(auth, tenant_id)
+    pool = request.app.state.pool
+    today = date.today()
+    current = await _period_data(pool, tid, did, "month", today)
+    previous = await _period_data(pool, tid, did, "month", _shift_month(today, -1))
+    return {"current": current, "previous": previous}
 
 
 @router.get("/quarter")
@@ -1063,6 +1083,55 @@ async def portal_sync_status(request: Request, tenant_id: Optional[str] = None):
             "last_seen": _saudi_iso(d["last_seen"]),
         } for d in devices],
     }
+
+
+@router.get("/branch-health")
+async def portal_branch_health(request: Request, tenant_id: Optional[str] = None):
+    state = request.app.state
+    auth = await _get_auth(request)
+    tid, did = _scope(auth, tenant_id)
+    pool = state.pool
+    now_utc = datetime.now(timezone.utc)
+
+    async with pool.acquire() as conn:
+        devices = await conn.fetch(
+            """
+            SELECT id AS device_id, branch_name, is_active, last_seen
+            FROM devices
+            WHERE tenant_id = $1::uuid AND ($2::uuid IS NULL OR id = $2::uuid)
+            ORDER BY branch_name
+            """,
+            tid, did,
+        )
+
+    result = []
+    for d in devices:
+        last_seen = d["last_seen"]
+        if not d["is_active"]:
+            status = "inactive"
+            lag_minutes = None
+        elif not last_seen:
+            status = "offline"
+            lag_minutes = None
+        else:
+            lag_minutes = max(int((now_utc - last_seen).total_seconds() // 60), 0)
+            if lag_minutes <= 5:
+                status = "online"
+            elif lag_minutes <= 30:
+                status = "delayed"
+            else:
+                status = "offline"
+
+        result.append({
+            "device_id": str(d["device_id"]),
+            "branch_name": d["branch_name"] or "فرع",
+            "is_active": bool(d["is_active"]),
+            "last_seen": _saudi_iso(last_seen),
+            "lag_minutes": lag_minutes,
+            "status": status,
+        })
+
+    return {"branches": result}
 
 
 # === CLIENT INFO ===
