@@ -25,6 +25,7 @@ import hashlib
 import json
 import logging
 import os
+import random
 import socket
 import sqlite3
 import sys
@@ -178,6 +179,19 @@ def _init_state_db() -> None:
             key TEXT PRIMARY KEY,
             value TEXT
         );
+        CREATE TABLE IF NOT EXISTS pending_http (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            endpoint TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            payload_hash TEXT NOT NULL,
+            expects_json INTEGER NOT NULL DEFAULT 0,
+            timeout_sec INTEGER NOT NULL DEFAULT 15,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(endpoint, payload_hash)
+        );
     """)
     conn.commit()
     conn.close()
@@ -249,6 +263,59 @@ def _hash_delete_many(table: str, pks: Iterable[str]) -> None:
     conn.executemany(
         "DELETE FROM row_hash WHERE table_name=? AND pk=?",
         [(table, pk) for pk in pks],
+    )
+    conn.commit()
+    conn.close()
+
+
+def _pending_enqueue(endpoint: str, payload: Dict[str, Any], expects_json: bool, timeout_sec: int) -> None:
+    payload_s = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+    payload_hash = hashlib.sha1(payload_s.encode("utf-8")).hexdigest()
+    conn = sqlite3.connect(STATE_DB)
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO pending_http(endpoint, payload, payload_hash, expects_json, timeout_sec)
+        VALUES(?, ?, ?, ?, ?)
+        """,
+        (endpoint, payload_s, payload_hash, 1 if expects_json else 0, int(timeout_sec)),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _pending_list(limit: int = 100) -> List[Tuple[int, str, str, int, int, int]]:
+    conn = sqlite3.connect(STATE_DB)
+    rows = conn.execute(
+        """
+        SELECT id, endpoint, payload, expects_json, timeout_sec, attempts
+        FROM pending_http
+        ORDER BY id ASC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def _pending_delete(row_id: int) -> None:
+    conn = sqlite3.connect(STATE_DB)
+    conn.execute("DELETE FROM pending_http WHERE id=?", (row_id,))
+    conn.commit()
+    conn.close()
+
+
+def _pending_fail(row_id: int, error_text: str) -> None:
+    conn = sqlite3.connect(STATE_DB)
+    conn.execute(
+        """
+        UPDATE pending_http
+        SET attempts = attempts + 1,
+            last_error = ?,
+            updated_at = datetime('now')
+        WHERE id = ?
+        """,
+        (error_text[:500], row_id),
     )
     conn.commit()
     conn.close()
@@ -397,6 +464,58 @@ class ApiClient:
         self.session = requests.Session()
         self.token = _load_token()
 
+    def _post_retry(self, endpoint: str, payload: Dict[str, Any], timeout_sec: int, expects_json: bool = False):
+        url = f"{self.cfg.api_base_url}{endpoint}"
+        attempts = 3
+        last_exc = None
+        for i in range(attempts):
+            try:
+                r = self.session.post(
+                    url, json=payload, headers=self._headers(),
+                    timeout=timeout_sec, verify=self.cfg.verify_tls,
+                )
+                # Retry only server-side/transient errors.
+                if r.status_code >= 500 and i < attempts - 1:
+                    delay = (2 ** i) + random.uniform(0.1, 0.7)
+                    time.sleep(delay)
+                    continue
+                r.raise_for_status()
+                return r.json() if expects_json else None
+            except (requests.ConnectionError, requests.Timeout) as e:
+                last_exc = e
+                if i < attempts - 1:
+                    delay = (2 ** i) + random.uniform(0.1, 0.7)
+                    time.sleep(delay)
+                    continue
+                raise
+            except requests.HTTPError as e:
+                last_exc = e
+                # Do not retry auth/validation errors.
+                code = e.response.status_code if e.response is not None else 0
+                if code in (400, 401, 403, 404, 410):
+                    raise
+                if i < attempts - 1:
+                    delay = (2 ** i) + random.uniform(0.1, 0.7)
+                    time.sleep(delay)
+                    continue
+                raise
+        if last_exc:
+            raise last_exc
+
+    def flush_pending_http(self, limit: int = 100) -> None:
+        queued = _pending_list(limit=limit)
+        if not queued:
+            return
+        for row_id, endpoint, payload_s, expects_json, timeout_sec, attempts in queued:
+            try:
+                payload = json.loads(payload_s)
+                self._post_retry(endpoint, payload, timeout_sec, expects_json=bool(expects_json))
+                _pending_delete(row_id)
+            except Exception as e:
+                _pending_fail(row_id, str(e))
+                # Break on first failure to avoid tight loop when offline.
+                break
+
     def _headers(self) -> Dict[str, str]:
         h = {"Content-Type": "application/json", "User-Agent": f"aronium-agent/{VERSION}"}
         if self.token:
@@ -426,64 +545,45 @@ class ApiClient:
         return data
 
     def heartbeat(self, payload: Dict[str, Any]) -> None:
-        url = f"{self.cfg.api_base_url}/api/v1/agents/heartbeat"
-        r = self.session.post(
-            url, json=payload, headers=self._headers(),
-            timeout=15, verify=self.cfg.verify_tls,
-        )
-        r.raise_for_status()
+        self._post_retry("/api/v1/agents/heartbeat", payload, 15, expects_json=False)
 
     def upsert(self, table: str, rows: List[Dict[str, Any]]) -> None:
         if not rows:
             return
-        url = f"{self.cfg.api_base_url}/api/v1/sync/upsert"
-        r = self.session.post(
-            url, json={"table": table, "rows": rows},
-            headers=self._headers(), timeout=60, verify=self.cfg.verify_tls,
-        )
-        r.raise_for_status()
+        self._post_retry("/api/v1/sync/upsert", {"table": table, "rows": rows}, 60, expects_json=False)
 
     def reconcile(self, table: str, pks: List[str]) -> List[str]:
-        url = f"{self.cfg.api_base_url}/api/v1/sync/reconcile"
-        r = self.session.post(
-            url, json={"table": table, "local_pks": pks},
-            headers=self._headers(), timeout=60, verify=self.cfg.verify_tls,
-        )
-        r.raise_for_status()
-        return r.json().get("deleted", [])
+        data = self._post_retry(
+            "/api/v1/sync/reconcile",
+            {"table": table, "local_pks": pks},
+            60,
+            expects_json=True,
+        ) or {}
+        return data.get("deleted", [])
 
     def send_notification(self, notification_type: str, message: str) -> None:
         """Send notification to dashboard."""
         try:
-            url = f"{self.cfg.api_base_url}/api/v1/agents/notifications"
             payload = {
                 "type": notification_type,
                 "message": message,
             }
-            r = self.session.post(
-                url, json=payload, headers=self._headers(),
-                timeout=15, verify=self.cfg.verify_tls,
-            )
-            r.raise_for_status()
+            self._post_retry("/api/v1/agents/notifications", payload, 15, expects_json=False)
             logger.debug(f"Notification sent: {notification_type}")
         except Exception as e:
+            _pending_enqueue("/api/v1/agents/notifications", payload, expects_json=False, timeout_sec=15)
             logger.warning(f"Failed to send notification: {e}")
 
     def report_day_status(self, closed_today: bool, current_hour: int) -> Dict[str, Any]:
         """Report day status to server for auto-close logic."""
+        payload = {
+            "closed_today": closed_today,
+            "current_hour": current_hour,
+        }
         try:
-            url = f"{self.cfg.api_base_url}/api/v1/agents/day-status"
-            payload = {
-                "closed_today": closed_today,
-                "current_hour": current_hour,
-            }
-            r = self.session.post(
-                url, json=payload, headers=self._headers(),
-                timeout=15, verify=self.cfg.verify_tls,
-            )
-            r.raise_for_status()
-            return r.json()
+            return self._post_retry("/api/v1/agents/day-status", payload, 15, expects_json=True) or {"auto_close": False}
         except Exception as e:
+            _pending_enqueue("/api/v1/agents/day-status", payload, expects_json=True, timeout_sec=15)
             logger.warning(f"Failed to report day status: {e}")
             return {"auto_close": False}
 
@@ -968,6 +1068,8 @@ def main() -> None:
 
         try:
             ensure_activated(cfg, api, snap)
+            # Replay durable queued control requests after connectivity/auth returns.
+            api.flush_pending_http(limit=100)
             
             # Check for company data changes (tax number, store name)
             if check_company_changes(snap):
