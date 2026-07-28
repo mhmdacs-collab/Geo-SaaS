@@ -1261,18 +1261,20 @@ async def list_backups(request: Request, branch_id: Optional[str] = None):
     async with pool.acquire() as conn:
         if did:
             rows = await conn.fetch(
-                """SELECT id, device_id, backup_date, file_size_bytes, status, created_at
-                   FROM db_backups
-                   WHERE tenant_id=$1::uuid AND device_id=$2::uuid
-                   ORDER BY backup_date DESC LIMIT 30""",
+                """SELECT b.id, b.device_id, d.branch_name, b.backup_date, b.file_size_bytes, b.status, b.created_at
+                   FROM db_backups b
+                   LEFT JOIN devices d ON d.id = b.device_id
+                   WHERE b.tenant_id=$1::uuid AND b.device_id=$2::uuid
+                   ORDER BY b.backup_date DESC LIMIT 30""",
                 tid, did,
             )
         else:
             rows = await conn.fetch(
-                """SELECT id, device_id, backup_date, file_size_bytes, status, created_at
-                   FROM db_backups
-                   WHERE tenant_id=$1::uuid
-                   ORDER BY backup_date DESC LIMIT 30""",
+                """SELECT b.id, b.device_id, d.branch_name, b.backup_date, b.file_size_bytes, b.status, b.created_at
+                   FROM db_backups b
+                   LEFT JOIN devices d ON d.id = b.device_id
+                   WHERE b.tenant_id=$1::uuid
+                   ORDER BY b.backup_date DESC LIMIT 30""",
                 tid,
             )
 
@@ -1281,6 +1283,7 @@ async def list_backups(request: Request, branch_id: Optional[str] = None):
             {
                 "id": str(r["id"]),
                 "device_id": str(r["device_id"]),
+                "branch_name": r["branch_name"] or "—",
                 "backup_date": r["backup_date"].isoformat(),
                 "file_size_bytes": r["file_size_bytes"],
                 "status": r["status"],
