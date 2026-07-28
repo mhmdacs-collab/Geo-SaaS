@@ -1227,18 +1227,97 @@ async def mark_notification_read(request: Request, notification_id: str):
     return {"success": True}
 
 
-@router.post("/notifications/mark-all-read")
-async def mark_all_notifications_read(request: Request):
-    """Mark all notifications as read for current tenant."""
-    state = request.app.state
+    return {"success": True}
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Cloud Backup Endpoints
+# ────────────────────────────────────────────────────────────────────────────
+def _r2_portal():
+    """Return (boto3_client, bucket_name) for portal pre-signed URLs, or (None, None)."""
+    access_key = os.environ.get("R2_ACCESS_KEY_ID", "")
+    secret_key = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+    endpoint = os.environ.get("R2_ENDPOINT_URL", "")
+    if not all([access_key, secret_key, endpoint]):
+        return None, None
+    import boto3
+    client = boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name="auto",
+    )
+    return client, os.environ.get("R2_BUCKET", "casher-sync-backups")
+
+
+@router.get("/backups")
+async def list_backups(request: Request, branch_id: Optional[str] = None):
+    """List cloud backups for the authenticated tenant."""
+    auth = await _get_auth(request)
+    tid, did = _scope(auth, branch_id)
+    pool = request.app.state.pool
+
+    async with pool.acquire() as conn:
+        if did:
+            rows = await conn.fetch(
+                """SELECT id, device_id, backup_date, file_size_bytes, status, created_at
+                   FROM db_backups
+                   WHERE tenant_id=$1::uuid AND device_id=$2::uuid
+                   ORDER BY backup_date DESC LIMIT 30""",
+                tid, did,
+            )
+        else:
+            rows = await conn.fetch(
+                """SELECT id, device_id, backup_date, file_size_bytes, status, created_at
+                   FROM db_backups
+                   WHERE tenant_id=$1::uuid
+                   ORDER BY backup_date DESC LIMIT 30""",
+                tid,
+            )
+
+    return {
+        "backups": [
+            {
+                "id": str(r["id"]),
+                "device_id": str(r["device_id"]),
+                "backup_date": r["backup_date"].isoformat(),
+                "file_size_bytes": r["file_size_bytes"],
+                "status": r["status"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/backups/{backup_id}/url")
+async def get_backup_url(request: Request, backup_id: str):
+    """Generate a 1-hour pre-signed download URL for a backup file."""
     auth = await _get_auth(request)
     tid = auth.get("tenant_id")
-    pool = state.pool
-    
+    pool = request.app.state.pool
+
     async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE notifications SET is_read = true WHERE tenant_id = $1::uuid AND is_read = false",
-            tid
+        row = await conn.fetchrow(
+            "SELECT file_key FROM db_backups WHERE id=$1 AND tenant_id=$2::uuid",
+            int(backup_id), tid,
         )
-    
-    return {"success": True}
+
+    if not row:
+        raise HTTPException(404, "Backup not found")
+
+    r2, bucket = _r2_portal()
+    if not r2:
+        raise HTTPException(503, "Cloud backup not configured")
+
+    try:
+        url = r2.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": row["file_key"]},
+            ExpiresIn=3600,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Failed to generate download URL: {e}")
+
+    return {"url": url}

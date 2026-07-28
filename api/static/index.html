@@ -519,6 +519,15 @@ button,input,select{font-family:inherit}
         ينتهي في: <strong id="subExpiry">—</strong>
       </div>
     </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        النسخ الاحتياطية السحابية
+      </div>
+      <div id="backupStatus" style="font-size:11px;color:var(--muted);margin-bottom:8px">جارٍ التحميل...</div>
+      <div id="backupList"></div>
+    </div>
   </div>
 </div>
 
@@ -1157,6 +1166,7 @@ function openSettings() {
   document.getElementById('pwErr').style.display = 'none';
   document.getElementById('pwSuc').style.display = 'none';
   updateSubExpiry();
+  loadBackups();
   showModal('settingsModal');
 }
 
@@ -1855,6 +1865,50 @@ document.addEventListener('click', function(e) {
     toggleNotifications();
   }
 });
+
+/* ── Cloud Backup ── */
+async function loadBackups() {
+  var el = document.getElementById('backupStatus');
+  var list = document.getElementById('backupList');
+  if (!el) return;
+  try {
+    var r = await fetch('/api/portal/backups', { headers: { Authorization: 'Bearer ' + TOKEN } });
+    var d = await r.json();
+    var backups = d.backups || [];
+    if (!backups.length) {
+      el.textContent = 'لا توجد نسخ احتياطية بعد — ستُنشأ يومياً بعد الساعة 2 صباحاً';
+      list.innerHTML = '';
+      return;
+    }
+    el.textContent = 'آخر نسخة: ' + backups[0].backup_date;
+    list.innerHTML = backups.slice(0, 7).map(function(b) {
+      var kb = b.file_size_bytes ? (Math.round(b.file_size_bytes / 1024) + ' KB') : '';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px">'
+        + '<span>' + b.backup_date + (kb ? ' <span style="color:var(--muted)">(' + kb + ')</span>' : '') + '</span>'
+        + '<button onclick="downloadBackup(\'' + b.id + '\')" style="font-size:10px;padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer">تنزيل</button>'
+        + '</div>';
+    }).join('');
+  } catch(e) {
+    el.textContent = 'تعذّر تحميل النسخ الاحتياطية';
+  }
+}
+
+async function downloadBackup(id) {
+  try {
+    var r = await fetch('/api/portal/backups/' + id + '/url', { headers: { Authorization: 'Bearer ' + TOKEN } });
+    var d = await r.json();
+    if (d.url) {
+      var a = document.createElement('a');
+      a.href = d.url;
+      a.download = 'aronium-backup-' + id + '.gz';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  } catch(e) {
+    alert('تعذّر تنزيل النسخة الاحتياطية');
+  }
+}
 </script>
 </body>
 </html>
