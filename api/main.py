@@ -5,6 +5,7 @@ Two tables only: tenants, devices.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import pathlib
@@ -128,13 +129,119 @@ sync_limiter = RateLimiter(max_requests=60, window_seconds=60)       # 60 sync r
 
 
 # ────────────────────────────────────────────────────────────────────────────
+# Server-side auto-close background task
+# ────────────────────────────────────────────────────────────────────────────
+async def _run_server_auto_close(pool: asyncpg.Pool) -> None:
+    """
+    Fill in missing day_sessions for the last completed business day window.
+
+    Runs after a 2-hour grace period past close_hour so that online agents
+    have a chance to self-report first.  Only fires when no day_session
+    (z_report or auto) already exists for that window.
+    """
+    saudi = timezone(timedelta(hours=3))
+    now_saudi = datetime.now(saudi)
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT t.id AS tenant_id, COALESCE(t.close_hour, 0) AS close_hour,
+                   d.id AS device_id, d.branch_name
+            FROM tenants t
+            JOIN devices d ON d.tenant_id = t.id
+            WHERE t.onboarded = true AND d.is_active = true
+        """)
+
+        closed_count = 0
+        for row in rows:
+            tenant_id  = row["tenant_id"]
+            device_id  = row["device_id"]
+            branch_name = row["branch_name"] or "الفرع"
+            close_hour  = int(row["close_hour"])
+
+            # Last completed window: [prev_close_saudi, this_close_saudi)
+            today_close_saudi = datetime(
+                now_saudi.year, now_saudi.month, now_saudi.day,
+                close_hour, tzinfo=saudi,
+            )
+            if now_saudi >= today_close_saudi:
+                window_end_saudi   = today_close_saudi
+                window_start_saudi = today_close_saudi - timedelta(days=1)
+            else:
+                window_end_saudi   = today_close_saudi - timedelta(days=1)
+                window_start_saudi = today_close_saudi - timedelta(days=2)
+
+            # Grace: wait 2 hours after window_end before the server fires
+            if now_saudi < window_end_saudi + timedelta(hours=2):
+                continue
+
+            window_start_utc = window_start_saudi.astimezone(timezone.utc)
+            window_end_utc   = window_end_saudi.astimezone(timezone.utc)
+
+            # Skip if any day_session already covers this window
+            existing = await conn.fetchval(
+                """SELECT COUNT(*) FROM day_sessions
+                   WHERE tenant_id=$1::uuid AND device_id=$2::uuid
+                     AND period_end > $3::timestamptz
+                     AND period_end <= $4::timestamptz""",
+                tenant_id, device_id,
+                window_start_utc, window_end_utc + timedelta(hours=1),
+            )
+            if existing and existing > 0:
+                continue
+
+            # Check if z_report was already synced (skip notification, still record session)
+            z_count = await conn.fetchval(
+                """SELECT COUNT(*) FROM z_report
+                   WHERE tenant_id=$1::uuid AND device_id=$2::uuid
+                     AND date_created >= $3::timestamptz
+                     AND date_created <  $4::timestamptz""",
+                tenant_id, device_id, window_start_utc, window_end_utc,
+            )
+
+            await conn.execute(
+                """INSERT INTO day_sessions
+                       (tenant_id, device_id, period_start, period_end, source)
+                   VALUES ($1::uuid, $2::uuid, $3, $4, 'server_auto')""",
+                tenant_id, device_id, window_start_utc, window_end_utc,
+            )
+
+            if not z_count or z_count == 0:
+                # Branch was offline — send auto-close notification
+                time_str = window_end_saudi.strftime("%I:%M %p")
+                await conn.execute(
+                    """INSERT INTO notifications
+                           (tenant_id, device_id, notification_type, message)
+                       VALUES ($1::uuid, $2::uuid, 'auto_close', $3)""",
+                    tenant_id, device_id,
+                    f"تم إنهاء اليوم بشكل أوتوماتيكي من {branch_name}",
+                )
+                closed_count += 1
+
+        if closed_count > 0:
+            log.info("server_auto_close: created %d missing session(s)", closed_count)
+
+
+async def _server_auto_close_loop(pool: asyncpg.Pool) -> None:
+    """Runs _run_server_auto_close every hour."""
+    # Initial delay: wait 5 minutes after startup before first check
+    await asyncio.sleep(300)
+    while True:
+        try:
+            await _run_server_auto_close(pool)
+        except Exception:
+            log.exception("server_auto_close: unexpected error")
+        await asyncio.sleep(3600)
+
+
+# ────────────────────────────────────────────────────────────────────────────
 # DB pool lifecycle
 # ────────────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.pool = await asyncpg.create_pool(
+    pool = await asyncpg.create_pool(
         dsn=_clean_dsn(DATABASE_URL), min_size=1, max_size=10, command_timeout=60,
     )
+    app.state.pool = pool
     # expose list of accepted JWT secrets and the primary secret used for signing
     app.state.jwt_secrets = JWT_SECRETS
     app.state.jwt_secret = JWT_SECRET
@@ -144,10 +251,16 @@ async def lifespan(app: FastAPI):
     if CORS_ORIGINS == ["*"]:
         log.warning("CORS_ORIGINS is wildcard; set explicit dashboard origins in production")
     log.info("DB pool ready")
+    _auto_close_task = asyncio.create_task(_server_auto_close_loop(pool))
     try:
         yield
     finally:
-        await app.state.pool.close()
+        _auto_close_task.cancel()
+        try:
+            await _auto_close_task
+        except asyncio.CancelledError:
+            pass
+        await pool.close()
         log.info("DB pool closed")
 
 
