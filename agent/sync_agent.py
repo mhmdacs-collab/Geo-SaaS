@@ -994,6 +994,7 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
                     all_synced += n
                     if n > 0:
                         z_report_synced = True
+                        _kv_set("z_report_synced_today", datetime.now().strftime("%Y-%m-%d"))
                 elif strategy == "hash_diff":
                     changed, total = _sync_hash_diff(conn, api, table)
                     all_synced += changed
@@ -1072,6 +1073,7 @@ def run_sync_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> None:
         result = api.report_day_status(False, current_hour)
         if result.get("auto_close"):
             logger.info("Day auto-closed by server (no ZReport synced)")
+            _kv_set("z_report_synced_today", datetime.now().strftime("%Y-%m-%d"))
     except Exception as e:
         logger.warning(f"Day status check failed: {e}")
     
@@ -1097,14 +1099,21 @@ def run_reconcile_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> Non
 
 # ─── Main ────────────────────────────────────────────────────────────────────
 def _should_run_backup(cfg: "AgentConfig") -> bool:
-    """Return True if it's time to run today's backup (once per day after backup_hour)."""
+    """Return True if a backup should run now.
+
+    Priority 1: Z-report or auto-close happened today (immediate backup).
+    Priority 2: Fallback — backup_hour reached with no backup yet today.
+    """
     if not cfg.aronium_db_path:
         return False
-    now = datetime.now()
-    if now.hour < cfg.backup_hour:
-        return False
-    today = now.strftime("%Y-%m-%d")
-    return _kv_get("last_backup_date", "") != today
+    today = datetime.now().strftime("%Y-%m-%d")
+    if _kv_get("last_backup_date", "") == today:
+        return False  # Already backed up today
+    # Trigger on day-close (Z-report or auto-close)
+    if _kv_get("z_report_synced_today", "") == today:
+        return True
+    # Fallback: backup_hour reached
+    return datetime.now().hour >= cfg.backup_hour
 
 
 def run_backup(cfg: "AgentConfig", api: "ApiClient", db_path: str) -> bool:
