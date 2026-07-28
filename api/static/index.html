@@ -394,6 +394,22 @@ button,input,select{font-family:inherit}
 .backup-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .backup-head svg{width:18px;height:18px;color:var(--accent)}
 .backup-title{font-size:15px;font-weight:800}
+.backup-hero{
+  background:linear-gradient(135deg,#0b1220,#0f172a 45%,#164e63);
+  color:#e2e8f0;
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:12px;
+  border:1px solid rgba(148,163,184,.25);
+  box-shadow:0 14px 26px -22px rgba(15,23,42,.8);
+}
+.backup-hero-title{font-size:15px;font-weight:800;color:#f8fafc;margin-bottom:10px}
+.backup-hero-grid{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px}
+.backup-hero-card{background:rgba(148,163,184,.15);border:1px solid rgba(203,213,225,.2);border-radius:10px;padding:8px}
+.backup-hero-label{font-size:10px;color:#cbd5e1;margin-bottom:2px}
+.backup-hero-val{font-size:13px;font-weight:800;color:#f8fafc}
+.backup-protected{color:#86efac}
+.backup-pending{color:#fcd34d}
 .backup-meta{font-size:11px;color:var(--muted);margin-bottom:10px}
 .backup-table{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .backup-row{display:grid;grid-template-columns:120px 1fr 90px 90px;padding:10px 14px;align-items:center;border-bottom:1px solid var(--border);font-size:12px}
@@ -521,6 +537,9 @@ button,input,select{font-family:inherit}
   .row2{grid-template-columns:1fr}
   .tax-grid{grid-template-columns:1fr}
   .mc-full{grid-column:1/-1}
+  .backup-hero-grid{grid-template-columns:1fr}
+  .backup-row{grid-template-columns:100px 1fr 74px 76px;padding:9px 10px;font-size:11px}
+  .backup-btn{padding:4px 8px;font-size:10px}
 }
 </style>
 </head>
@@ -2081,10 +2100,34 @@ async function loadBackupsTab() {
     var r = await fetch('/api/portal/backups' + branchParam, { headers: { Authorization: 'Bearer ' + TOKEN } });
     var d = await r.json();
     var backups = d.backups || [];
+    var hasBackups = backups.length > 0;
+    var first = hasBackups ? backups[0] : null;
+    var lastSnapshot = '—';
+    if (first) {
+      var dt = first.created_at ? new Date(first.created_at) : null;
+      if (dt && !isNaN(dt.getTime())) {
+        var now = new Date();
+        var isToday = dt.toDateString() === now.toDateString();
+        var hour = dt.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+        lastSnapshot = (isToday ? 'اليوم ' : first.backup_date + ' ') + hour;
+      } else {
+        lastSnapshot = first.backup_date;
+      }
+    }
+    var statusLabel = hasBackups ? '✓ محمية' : '⏳ بانتظار أول نسخة';
+    var statusClass = hasBackups ? 'backup-protected' : 'backup-pending';
     var html = '<div class="backup-wrap">'
       + '<div class="backup-head">'
       + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
       + '<span class="backup-title">نسخ قواعد البيانات</span>'
+      + '</div>'
+      + '<div class="backup-hero">'
+      + '<div class="backup-hero-title">☁️ حماية بيانات نشاطك</div>'
+      + '<div class="backup-hero-grid">'
+      + '<div class="backup-hero-card"><div class="backup-hero-label">آخر نسخة</div><div class="backup-hero-val">' + escapeHtml(lastSnapshot) + '</div></div>'
+      + '<div class="backup-hero-card"><div class="backup-hero-label">الحالة</div><div class="backup-hero-val ' + statusClass + '">' + escapeHtml(statusLabel) + '</div></div>'
+      + '<div class="backup-hero-card"><div class="backup-hero-label">عدد النسخ</div><div class="backup-hero-val">' + backups.length + ' نسخة</div></div>'
+      + '</div>'
       + '</div>';
     if (!backups.length) {
       html += '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">لا توجد نسخ احتياطية بعد — ستُنشأ تلقائياً بعد إغلاق اليوم</div>';
