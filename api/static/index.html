@@ -466,38 +466,114 @@ button,input,select{font-family:inherit}
   .pr-footer .pr-footer-sys{font-size:7px;color:#CBD5E1;margin-top:2px}
 }
 
+/* ── MOBILE BRANCH BAR ── */
+.mobile-branch-bar{display:none}
+
+/* ── MOBILE BOTTOM NAV ── */
+.mobile-bottom-nav{display:none}
+
+/* ── PAGE CONTEXT BAR ── */
+.page-context-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;padding-bottom:12px;
+  border-bottom:1px solid var(--gray-200)
+}
+.page-context-title{font-size:16px;font-weight:800;color:var(--gray-900);display:flex;align-items:center;gap:8px}
+.page-context-title i{width:18px;height:18px;color:var(--primary)}
+.branch-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  background:var(--primary-light);color:var(--primary-dark);
+  border:1px solid #BFDBFE;border-radius:999px;
+  padding:4px 12px;font-size:11px;font-weight:700
+}
+.branch-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--primary);display:inline-block}
+
 /* ── MOBILE ── */
 @media(max-width:768px){
-  .status-bar{font-size:10px;padding:0 10px;gap:10px}
+  /* Status bar: hide extra items, truncate sync text */
+  .status-bar{
+    font-size:10px;padding:0 10px;gap:8px;
+    justify-content:space-between;overflow:hidden
+  }
+  .status-sep{display:none}
+  .status-item:not(:first-child):not(:last-child){display:none}
+  #syncInfo{
+    max-width:160px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;
+    display:inline-block
+  }
+
+  /* Header */
   .app-header{padding:0 12px;height:50px;top:32px}
-  .app-body{padding-top:82px;flex-direction:column}
-  .hdr-info h1{font-size:11px}
-  .hdr-info p{font-size:9px}
-  .hdr-btn{padding:6px 8px;font-size:10px}
+  .hdr-info p{display:none}
+  .hdr-info h1{font-size:13px}
   .hdr-btn span{display:none}
+  .hdr-btn{padding:6px 8px}
   .notif-btn{padding:6px}
   .notif-panel{position:fixed;top:82px;left:4px;right:4px;width:auto;max-height:400px}
-  .sidebar{
-    width:100%;position:relative;top:0;height:auto;border-left:none;
-    border-bottom:1px solid var(--gray-200);padding:8px 10px;
-    display:flex;flex-direction:row;flex-wrap:nowrap;gap:6px;
-    align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch;
-    scrollbar-width:none;-ms-overflow-style:none
+
+  /* Hide desktop sidebar entirely on mobile */
+  .sidebar{display:none!important}
+
+  /* App body: no sidebar, add bottom padding for bottom nav */
+  .app-body{padding-top:82px;flex-direction:column}
+  .main{padding:12px 12px 80px 12px;min-height:auto}
+
+  /* Mobile branch selector bar (horizontal scrollable) */
+  .mobile-branch-bar{
+    display:flex;
+    position:sticky;top:82px;z-index:38;
+    background:#fff;border-bottom:1px solid var(--gray-200);
+    padding:8px 12px;gap:6px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;-ms-overflow-style:none;
+    flex-shrink:0
   }
-  .sidebar::-webkit-scrollbar{display:none}
-  .sb-title{display:none}
-  .sb-item{margin-bottom:0;padding:6px 12px;font-size:10px;border-radius:99px;flex-shrink:0;gap:5px;background:var(--gray-50);border:1px solid var(--gray-200);white-space:nowrap;display:flex;align-items:center}
-  .sb-item .sb-sales{display:none}
-  .sb-all{border:none;background:transparent;padding:0;margin:0}
-  .sb-all .sb-item{border:1px solid var(--gray-200);border-radius:99px}
-  .nav-divider{display:none}
-  .main-nav{flex-direction:row;gap:4px;flex-wrap:nowrap;flex-shrink:0}
-  .nav-item{padding:6px 10px;border-radius:99px;font-size:10px;border:1px solid var(--gray-200);white-space:nowrap;width:auto}
-  .nav-item i{width:12px;height:12px}
-  .main{padding:12px}
+  .mobile-branch-bar::-webkit-scrollbar{display:none}
+  .mob-branch-chip{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:5px 12px;border-radius:999px;font-size:11px;font-weight:600;
+    border:1px solid var(--gray-200);background:var(--gray-50);
+    color:var(--gray-700);cursor:pointer;white-space:nowrap;
+    transition:var(--tr);flex-shrink:0
+  }
+  .mob-branch-chip.active{
+    background:var(--primary);color:#fff;border-color:var(--primary)
+  }
+  .mob-branch-chip .mob-dot{
+    width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0
+  }
+  .mob-branch-chip.active .mob-dot{background:rgba(255,255,255,.8)}
+
+  /* Mobile bottom navigation */
+  .mobile-bottom-nav{
+    display:flex;
+    position:fixed;bottom:0;left:0;right:0;
+    height:60px;background:#fff;
+    border-top:1px solid var(--gray-200);
+    z-index:50;align-items:stretch;
+    box-shadow:0 -2px 8px rgba(0,0,0,.06)
+  }
+  .mob-nav-item{
+    flex:1;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:3px;background:none;border:none;
+    font-size:9px;font-weight:600;color:var(--gray-500);
+    cursor:pointer;transition:var(--tr);padding:4px 2px;
+    border-top:2px solid transparent
+  }
+  .mob-nav-item i{width:20px;height:20px}
+  .mob-nav-item.active{
+    color:var(--primary);
+    border-top-color:var(--primary)
+  }
+  .mob-nav-item.active i{color:var(--primary)}
+
+  /* Metrics responsive */
+  .app-body{padding-top:82px}
   .mgrid{grid-template-columns:repeat(2,1fr);gap:8px}
   .mgrid-3{grid-template-columns:repeat(3,1fr);gap:6px}
-  .mgrid-3 .mc-val{font-size:13px}
+  .mgrid-3 .mc-val{font-size:14px}
   .mgrid-3 .mc-label{font-size:9px}
   .mc-val{font-size:16px}
   .row2{grid-template-columns:1fr}
@@ -506,6 +582,11 @@ button,input,select{font-family:inherit}
   .backup-hero-grid{grid-template-columns:1fr}
   .backup-row{grid-template-columns:100px 1fr 70px 74px;padding:9px 10px;font-size:11px}
   .ai-manager-card{padding:12px 14px}
+  .sub-tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+  .sub-tabs::-webkit-scrollbar{display:none}
+  .sub-tab{flex-shrink:0}
+  .page-context-bar{margin-bottom:10px;padding-bottom:8px}
+  .page-context-title{font-size:14px}
 }
 </style>
 </head>
@@ -560,6 +641,11 @@ button,input,select{font-family:inherit}
         تحديث
       </button>
     </div>
+  </div>
+
+  <!-- MOBILE BRANCH BAR (visible only on mobile) -->
+  <div class="mobile-branch-bar" id="mobileBranchBar">
+    <!-- filled by renderSidebar() -->
   </div>
 
   <!-- MAIN HEADER -->
@@ -675,11 +761,46 @@ button,input,select{font-family:inherit}
         </button>
       </div>
 
+      <!-- Page context bar: title + current branch badge -->
+      <div class="page-context-bar" id="pageContextBar">
+        <div class="page-context-title" id="pageContextTitle">
+          <i data-lucide="layout-dashboard"></i>
+          <span>لوحة التحكم</span>
+        </div>
+        <div class="branch-badge" id="pageContextBranch" style="display:none">
+          <span class="branch-badge-dot"></span>
+          <span id="pageContextBranchName">جميع الفروع</span>
+        </div>
+      </div>
+
       <!-- Main content area -->
       <div id="dashboardContent"></div>
     </main>
   </div>
-</div>
+
+  <!-- MOBILE BOTTOM NAVIGATION -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <button class="mob-nav-item active" data-page="dashboard" onclick="switchPage('dashboard',this)">
+      <i data-lucide="layout-dashboard"></i>
+      <span>الرئيسية</span>
+    </button>
+    <button class="mob-nav-item" data-page="operations" onclick="switchPage('operations',this)">
+      <i data-lucide="receipt"></i>
+      <span>العمليات</span>
+    </button>
+    <button class="mob-nav-item" data-page="tax" onclick="switchPage('tax',this)">
+      <i data-lucide="file-text"></i>
+      <span>الإقرار</span>
+    </button>
+    <button class="mob-nav-item" data-page="backup" onclick="switchPage('backup',this)">
+      <i data-lucide="cloud"></i>
+      <span>النسخ</span>
+    </button>
+    <button class="mob-nav-item" data-page="settings" onclick="switchPage('settings',this)">
+      <i data-lucide="settings"></i>
+      <span>الإعدادات</span>
+    </button>
+  </nav>
 
 <!-- ══════════ SETTINGS MODAL ══════════ -->
 <div class="modal" id="settingsModal">
@@ -890,7 +1011,10 @@ function doLogout() {
 /* ── SIDEBAR ── */
 function renderSidebar() {
   var list = document.getElementById('branchList');
+  var mobilebar = document.getElementById('mobileBranchBar');
   var html = '';
+  var mobHtml = '<button class="mob-branch-chip' + (CURRENT_BRANCH === null ? ' active' : '') + '" onclick="selectBranch(null)">'
+    + '<span class="mob-dot"></span>جميع الفروع</button>';
   var totalSales = 0;
   for (var i = 0; i < BRANCHES.length; i++) {
     var b = BRANCHES[i];
@@ -903,8 +1027,14 @@ function renderSidebar() {
       + escapeHtml(b.branch_name)
       + '<span class="sb-sales">' + fmt(sales) + '</span>'
       + '</div>';
+    // mobile chip
+    mobHtml += '<button class="mob-branch-chip' + (CURRENT_BRANCH === b.device_id ? ' active' : '')
+      + '" data-branch="' + escapeHtml(b.device_id) + '" onclick="selectBranch(this.getAttribute(\'data-branch\'))">'
+      + '<span class="mob-dot" style="background:' + dotColor + '"></span>'
+      + escapeHtml(b.branch_name) + '</button>';
   }
   list.innerHTML = html;
+  if (mobilebar) mobilebar.innerHTML = mobHtml;
   document.getElementById('sbAllSales').textContent = fmt(totalSales);
   updateSidebarActive();
 }
@@ -916,10 +1046,16 @@ function updateSidebarActive() {
     items[i].classList.toggle('active', bid === CURRENT_BRANCH);
   }
   document.getElementById('sbAll').classList.toggle('active', CURRENT_BRANCH === null);
+  // update mobile chips
+  document.querySelectorAll('#mobileBranchBar .mob-branch-chip').forEach(function(c) {
+    var cbid = c.getAttribute('data-branch') || null;
+    c.classList.toggle('active', cbid === CURRENT_BRANCH);
+  });
+  _updatePageContextBar(currentPage);
 }
 
 function selectBranch(deviceId) {
-  CURRENT_BRANCH = deviceId;
+  CURRENT_BRANCH = deviceId || null;
   updateSidebarActive();
   updateScanTabVisibility();
   refreshData();
@@ -2203,10 +2339,39 @@ async function downloadBackup(id) {
 var currentPage = 'dashboard';
 var lastDayData = null;
 
+var PAGE_LABELS = {
+  dashboard: {icon:'layout-dashboard', label:'لوحة التحكم'},
+  operations: {icon:'receipt', label:'العمليات'},
+  tax: {icon:'file-text', label:'الإقرار الضريبي'},
+  backup: {icon:'cloud', label:'النسخ الاحتياطي'},
+  settings: {icon:'settings', label:'الإعدادات'}
+};
+
+function _updatePageContextBar(page) {
+  var info = PAGE_LABELS[page] || {icon:'layout-dashboard',label:''};
+  var titleEl = document.getElementById('pageContextTitle');
+  var badgeEl = document.getElementById('pageContextBranch');
+  var nameEl  = document.getElementById('pageContextBranchName');
+  if (titleEl) titleEl.innerHTML = '<i data-lucide="'+info.icon+'"></i><span>'+info.label+'</span>';
+  if (CURRENT_BRANCH !== null) {
+    var bname = BRANCHES.find(function(b){return b.device_id===CURRENT_BRANCH;});
+    if (badgeEl) badgeEl.style.display = '';
+    if (nameEl) nameEl.textContent = bname ? bname.branch_name : 'فرع';
+  } else {
+    if (badgeEl) badgeEl.style.display = (page==='dashboard') ? 'none' : '';
+    if (nameEl) nameEl.textContent = 'جميع الفروع';
+  }
+}
+
 function switchPage(page, el) {
   currentPage = page;
+  // Desktop sidebar nav
   document.querySelectorAll('.nav-item').forEach(function(b) { b.classList.remove('active'); });
-  if (el) el.classList.add('active');
+  if (el && el.classList.contains('nav-item')) el.classList.add('active');
+  // Mobile bottom nav
+  document.querySelectorAll('.mob-nav-item').forEach(function(b) { b.classList.remove('active'); });
+  var mobBtn = document.querySelector('.mob-nav-item[data-page="'+page+'"]');
+  if (mobBtn) mobBtn.classList.add('active');
 
   var opsSubTabs = document.getElementById('opsSubTabs');
   var aiCard = document.getElementById('aiManagerCard');
@@ -2216,11 +2381,12 @@ function switchPage(page, el) {
   if (aiCard) aiCard.style.display = (page === 'dashboard') ? '' : 'none';
   if (scanBtn) scanBtn.style.display = (page === 'operations' && CURRENT_BRANCH !== null) ? '' : 'none';
 
+  _updatePageContextBar(page);
+
   if (page === 'dashboard') {
     switchTab('today', document.querySelector('.tab[onclick*="today"]'));
     if (lastDayData) updateAIManager(lastDayData, LAST_SYNC_STATUS);
   } else if (page === 'operations') {
-    // default to today sub-tab
     var firstSubTab = document.querySelector('#opsSubTabs .sub-tab');
     if (firstSubTab) switchOpsTab('today', firstSubTab);
     else switchTab('today', document.querySelector('.tab[onclick*="today"]'));
