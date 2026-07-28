@@ -520,15 +520,6 @@ button,input,select{font-family:inherit}
         ينتهي في: <strong id="subExpiry">—</strong>
       </div>
     </div>
-
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
-      <div style="font-size:12px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        النسخ الاحتياطية السحابية
-      </div>
-      <div id="backupStatus" style="font-size:11px;color:var(--muted);margin-bottom:8px">جارٍ التحميل...</div>
-      <div id="backupList"></div>
-    </div>
   </div>
 </div>
 
@@ -1179,7 +1170,6 @@ function openSettings() {
   document.getElementById('pwErr').style.display = 'none';
   document.getElementById('pwSuc').style.display = 'none';
   updateSubExpiry();
-  loadBackups();
   showModal('settingsModal');
 }
 
