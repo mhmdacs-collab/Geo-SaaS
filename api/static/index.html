@@ -453,8 +453,8 @@ button,input,select{font-family:inherit}
         <button class="tab" onclick="switchTab('yesterday',this)">العمليات السابقة</button>
         <button class="tab" onclick="switchTab('month',this)">ملخص الشهر</button>
         <button class="tab" onclick="switchTab('quarter',this)">الإقرار الضريبي</button>
-        <button class="tab" onclick="switchTab('backups',this)">نسخ قواعد البيانات</button>
         <button class="tab" onclick="switchTab('scan',this)">مسح فاتورة مشتريات</button>
+        <button class="tab" id="backupsTab" onclick="switchTab('backups',this)" style="display:none">نسخ قواعد البيانات</button>
       </div>
 
       <div id="dashboardContent"></div>
@@ -709,6 +709,7 @@ function selectBranch(deviceId) {
 
 function updateScanTabVisibility() {
   var scanTab = document.querySelector('.tab[onclick*="scan"]');
+  var backupsTab = document.getElementById('backupsTab');
   if (scanTab) {
     if (CURRENT_BRANCH === null) {
       scanTab.style.display = 'none';
@@ -717,6 +718,16 @@ function updateScanTabVisibility() {
       }
     } else {
       scanTab.style.display = '';
+    }
+  }
+  if (backupsTab) {
+    if (CURRENT_BRANCH === null) {
+      backupsTab.style.display = '';
+    } else {
+      backupsTab.style.display = 'none';
+      if (currentTab === 'backups') {
+        switchTab('today', document.querySelector('.tab[onclick*="today"]'));
+      }
     }
   }
 }
@@ -1887,14 +1898,14 @@ async function loadBackupsTab() {
     } else {
       html += '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">آخر نسخة: ' + backups[0].backup_date + ' — إجمالي: ' + backups.length + ' نسخة</div>';
       html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-      html += '<div style="display:grid;grid-template-columns:1fr 1fr 80px 90px;gap:0;padding:8px 14px;background:var(--bg2);font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">'
-        + '<div>التاريخ</div><div>الجهاز</div><div>الحجم</div><div></div></div>';
+      html += '<div style="display:grid;grid-template-columns:120px 1fr 90px 90px;gap:0;padding:8px 14px;background:var(--bg2);font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">'
+        + '<div>التاريخ</div><div>الفرع</div><div>الحجم</div><div></div></div>';
       backups.forEach(function(b) {
         var kb = b.file_size_bytes ? (Math.round(b.file_size_bytes / 1024) + ' KB') : '—';
-        var shortDev = b.device_id ? b.device_id.substring(0, 8) + '…' : '—';
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr 80px 90px;gap:0;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;align-items:center">'
+        var branchLabel = b.branch_name || '—';
+        html += '<div style="display:grid;grid-template-columns:120px 1fr 90px 90px;gap:0;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;align-items:center">'
           + '<div style="font-weight:600">' + b.backup_date + '</div>'
-          + '<div style="color:var(--muted);font-family:monospace;font-size:11px">' + shortDev + '</div>'
+          + '<div>' + escapeHtml(branchLabel) + '</div>'
           + '<div style="color:var(--muted)">' + kb + '</div>'
           + '<div><button onclick="downloadBackup(\'' + b.id + '\')" style="font-size:11px;padding:4px 12px;border:1px solid var(--accent);border-radius:6px;background:transparent;color:var(--accent);cursor:pointer;font-weight:600">⬇ تنزيل</button></div>'
           + '</div>';
