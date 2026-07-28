@@ -453,6 +453,7 @@ button,input,select{font-family:inherit}
         <button class="tab" onclick="switchTab('yesterday',this)">العمليات السابقة</button>
         <button class="tab" onclick="switchTab('month',this)">ملخص الشهر</button>
         <button class="tab" onclick="switchTab('quarter',this)">الإقرار الضريبي</button>
+        <button class="tab" onclick="switchTab('backups',this)">نسخ قواعد البيانات</button>
         <button class="tab" onclick="switchTab('scan',this)">مسح فاتورة مشتريات</button>
       </div>
 
@@ -752,6 +753,7 @@ function loadTabData() {
   else if (currentTab === 'yesterday') loadDay(-1);
   else if (currentTab === 'month') loadMonth();
   else if (currentTab === 'quarter') loadQuarterTab();
+  else if (currentTab === 'backups') loadBackupsTab();
   else if (currentTab === 'scan') renderScanTab();
 }
 
@@ -1867,6 +1869,45 @@ document.addEventListener('click', function(e) {
 });
 
 /* ── Cloud Backup ── */
+async function loadBackupsTab() {
+  var branchParam = CURRENT_BRANCH ? '?branch_id=' + encodeURIComponent(CURRENT_BRANCH) : '';
+  var container = document.getElementById('dashboardContent');
+  container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">جارٍ التحميل...</div>';
+  try {
+    var r = await fetch('/api/portal/backups' + branchParam, { headers: { Authorization: 'Bearer ' + TOKEN } });
+    var d = await r.json();
+    var backups = d.backups || [];
+    var html = '<div style="padding:16px 0">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+      + '<span style="font-size:15px;font-weight:700">نسخ قواعد البيانات</span>'
+      + '</div>';
+    if (!backups.length) {
+      html += '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">لا توجد نسخ احتياطية بعد — ستُنشأ تلقائياً بعد إغلاق اليوم</div>';
+    } else {
+      html += '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">آخر نسخة: ' + backups[0].backup_date + ' — إجمالي: ' + backups.length + ' نسخة</div>';
+      html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr 80px 90px;gap:0;padding:8px 14px;background:var(--bg2);font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">'
+        + '<div>التاريخ</div><div>الجهاز</div><div>الحجم</div><div></div></div>';
+      backups.forEach(function(b) {
+        var kb = b.file_size_bytes ? (Math.round(b.file_size_bytes / 1024) + ' KB') : '—';
+        var shortDev = b.device_id ? b.device_id.substring(0, 8) + '…' : '—';
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr 80px 90px;gap:0;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;align-items:center">'
+          + '<div style="font-weight:600">' + b.backup_date + '</div>'
+          + '<div style="color:var(--muted);font-family:monospace;font-size:11px">' + shortDev + '</div>'
+          + '<div style="color:var(--muted)">' + kb + '</div>'
+          + '<div><button onclick="downloadBackup(\'' + b.id + '\')" style="font-size:11px;padding:4px 12px;border:1px solid var(--accent);border-radius:6px;background:transparent;color:var(--accent);cursor:pointer;font-weight:600">⬇ تنزيل</button></div>'
+          + '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);font-size:13px">تعذّر تحميل النسخ الاحتياطية</div>';
+  }
+}
+
 async function loadBackups() {
   var el = document.getElementById('backupStatus');
   var list = document.getElementById('backupList');
