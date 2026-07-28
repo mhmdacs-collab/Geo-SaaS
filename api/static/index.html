@@ -17,7 +17,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --brand:#00BCD4;--brand-d:#0891B2;--brand-xl:#E0F7FA;
+  --brand:#0ea5c9;--brand-d:#0b7e9a;--brand-xl:#e6f7fb;
+  --accent:#0ea5c9;--surface:#ffffff;--bg2:#f8fafc;
   --dark:#111827;--darker:#04070d;
   --bg:#F1F5F9;--card:#fff;
   --text:#0f172a;--muted:#64748b;
@@ -30,11 +31,18 @@
   --sh:0 1px 3px rgb(15 23 42/.06);
   --sh-md:0 4px 12px -4px rgb(15 23 42/.1);
   --sh-lg:0 12px 32px -8px rgb(15 23 42/.2);
-  --grad-brand:linear-gradient(135deg,#00BCD4,#0369A1);
+  --grad-brand:linear-gradient(135deg,#0ea5c9,#1d4ed8);
   --tr:all .2s ease;
 }
 *{box-sizing:border-box;margin:0;padding:0;font-family:'Cairo',sans-serif}
-body{background:var(--bg);color:var(--text);min-height:100vh}
+body{
+  background:
+    radial-gradient(1200px 500px at 90% -20%, #dbeafe 0%, transparent 60%),
+    radial-gradient(1000px 450px at 5% 0%, #cffafe 0%, transparent 55%),
+    var(--bg);
+  color:var(--text);
+  min-height:100vh;
+}
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:99px}
 button,input,select{font-family:inherit}
@@ -57,7 +65,19 @@ button,input,select{font-family:inherit}
 
 /* ── APP LAYOUT ── */
 #appPage{display:none;min-height:100vh}
-.app-header{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.app-header{
+  background:rgba(255,255,255,.92);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+  padding:0 20px;
+  height:56px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;
+  top:0;
+  z-index:50
+}
 .hdr-left{display:flex;align-items:center;gap:10px}
 .hdr-logo{width:32px;height:32px;background:var(--grad-brand);border-radius:8px;display:flex;align-items:center;justify-content:center}
 .hdr-logo svg{width:16px;height:16px;color:#fff}
@@ -88,10 +108,20 @@ button,input,select{font-family:inherit}
 .main{flex:1;padding:20px;max-width:1100px}
 
 /* tabs */
-.tabs{display:flex;background:#fff;border:1px solid var(--border);border-radius:99px;padding:4px;gap:2px;margin-bottom:16px;width:fit-content;box-shadow:var(--sh)}
+.tabs{
+  display:flex;
+  background:rgba(255,255,255,.9);
+  border:1px solid var(--border);
+  border-radius:99px;
+  padding:4px;
+  gap:2px;
+  margin-bottom:16px;
+  width:fit-content;
+  box-shadow:var(--sh)
+}
 .tab{padding:8px 18px;border-radius:99px;border:none;background:transparent;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:var(--tr);white-space:nowrap}
 .tab:hover{color:var(--text)}
-.tab.active{background:var(--grad-brand);color:#fff}
+.tab.active{background:var(--grad-brand);color:#fff;box-shadow:0 4px 10px -6px rgba(29,78,216,.75)}
 
 /* metrics */
 .mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
@@ -175,7 +205,19 @@ button,input,select{font-family:inherit}
 .cmp-fill{height:100%;border-radius:99px;transition:width .6s}
 
 /* sync bar */
-.sync-bar{background:#fff;border:1px solid var(--border);border-radius:var(--rm);padding:8px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;box-shadow:var(--sh);font-size:11px;color:var(--muted)}
+.sync-bar{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:14px;
+  box-shadow:var(--sh);
+  font-size:11px;
+  color:var(--muted)
+}
 .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;margin-left:6px}
 .sync-btn{background:none;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:var(--rs);font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px}
 .sync-btn:hover{border-color:var(--brand);color:var(--brand-d)}
@@ -195,11 +237,25 @@ button,input,select{font-family:inherit}
 .notif-clear{background:none;border:none;color:var(--brand);font-size:11px;font-weight:600;cursor:pointer}
 .notif-clear:hover{color:var(--brand-d)}
 .notif-list{max-height:400px;overflow-y:auto;padding:8px}
-.notif-item{padding:10px 12px;border-radius:var(--rs);margin-bottom:4px;background:#f8fafc;border-right:3px solid var(--border);cursor:pointer;transition:var(--tr)}
+.notif-item{padding:10px 12px;border-radius:10px;margin-bottom:6px;background:#f8fafc;border-right:3px solid var(--border);cursor:pointer;transition:var(--tr)}
 .notif-item:hover{background:var(--brand-xl)}
 .notif-item.unread{background:#fff;border-right-color:var(--brand)}
 .notif-msg{font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px}
 .notif-time{font-size:10px;color:var(--muted)}
+.notif-meta{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.notif-chip{
+  font-size:9px;
+  font-weight:700;
+  padding:2px 7px;
+  border-radius:999px;
+  border:1px solid transparent;
+  color:#0f172a;
+  background:#e2e8f0
+}
+.notif-chip-daily_close{background:#e0f2fe;color:#0369a1;border-color:#bae6fd}
+.notif-chip-auto_close{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+.notif-chip-tax_ready{background:#ecfdf5;color:#047857;border-color:#bbf7d0}
+.notif-chip-vat_reminder{background:#fffbeb;color:#b45309;border-color:#fde68a}
 .notif-empty{text-align:center;padding:24px;color:var(--muted);font-size:12px}
 .notif-type-daily_close{border-right-color:var(--brand)!important}
 .notif-type-invoice_deleted{border-right-color:var(--red)!important}
@@ -247,6 +303,67 @@ button,input,select{font-family:inherit}
 .mclose{background:#f1f5f9;border:none;width:28px;height:28px;border-radius:8px;font-size:16px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .mclose:hover{background:var(--red-l);color:var(--red)}
 .merr{display:none;background:var(--red-l);color:var(--red);border-radius:var(--rs);padding:8px;font-size:11px;font-weight:600;margin-bottom:10px;text-align:center}
+.settings-grid{display:grid;gap:12px}
+.settings-card{
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:12px;
+  background:linear-gradient(180deg,#fff,#fafcff);
+}
+.settings-title{font-size:12px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.settings-title svg{width:14px;height:14px;color:var(--brand-d)}
+.settings-row{display:flex;gap:8px;align-items:center}
+.settings-help{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.55}
+.settings-inline{font-size:11px;color:var(--muted)}
+.settings-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:3px 9px;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:700;
+  background:#e0f2fe;
+  color:#0369a1;
+  border:1px solid #bae6fd;
+}
+.settings-chip.warn{
+  background:#fff7ed;
+  color:#c2410c;
+  border-color:#fed7aa;
+}
+.settings-suc{
+  display:none;
+  background:var(--green-l);
+  color:#047857;
+  border:1px solid #bbf7d0;
+  border-radius:8px;
+  padding:8px;
+  font-size:11px;
+  font-weight:700;
+  margin-top:8px;
+}
+.backup-wrap{padding:4px 0 16px}
+.backup-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.backup-head svg{width:18px;height:18px;color:var(--accent)}
+.backup-title{font-size:15px;font-weight:800}
+.backup-meta{font-size:11px;color:var(--muted);margin-bottom:10px}
+.backup-table{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.backup-row{display:grid;grid-template-columns:120px 1fr 90px 90px;padding:10px 14px;align-items:center;border-bottom:1px solid var(--border);font-size:12px}
+.backup-row:last-child{border-bottom:none}
+.backup-row.head{background:#f8fafc;font-size:11px;font-weight:700;color:var(--muted)}
+.backup-date{font-weight:700}
+.backup-btn{
+  font-size:11px;
+  padding:4px 12px;
+  border:1px solid var(--accent);
+  border-radius:6px;
+  background:transparent;
+  color:var(--accent);
+  cursor:pointer;
+  font-weight:700;
+}
+.backup-btn:hover{background:#ecfeff}
 
 /* ── PRINT ── */
 #printDoc{display:none}
@@ -473,51 +590,60 @@ button,input,select{font-family:inherit}
       <button class="mclose" onclick="hideModal('settingsModal')">&times;</button>
     </div>
 
-    <div class="fg">
-      <label>الإغلاق الأوتوماتيكي</label>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input type="number" id="setHour" min="1" max="12" value="12" style="width:60px">
-        <select id="setAmpm" style="flex:1">
-          <option value="PM">مساءً</option>
-          <option value="AM">صباحاً</option>
-        </select>
+    <div class="settings-grid">
+      <div class="settings-card">
+        <div class="settings-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="10"/></svg>
+          الإغلاق الأوتوماتيكي
+        </div>
+        <div class="settings-row">
+          <input type="number" id="setHour" min="1" max="12" value="12" style="width:70px">
+          <select id="setAmpm" style="flex:1">
+            <option value="PM">مساءً</option>
+            <option value="AM">صباحاً</option>
+          </select>
+        </div>
+        <p class="settings-help">
+          إذا لم يتم إغلاق اليوم يدويًا، يتم الإغلاق تلقائيًا عند هذا الوقت.
+          ننصح بتحديده بعد ساعة إلى ساعتين من موعد إغلاق المتجر الفعلي.
+        </p>
+        <div class="settings-inline">الوقت الحالي المحدد: <span id="closeHourText" class="settings-chip">—</span></div>
+        <button type="button" class="btn" onclick="saveCloseHour()" style="margin-top:10px">حفظ وقت الإغلاق</button>
+        <div id="closeHourSuc" class="settings-suc">تم حفظ وقت الإغلاق بنجاح</div>
       </div>
-      <p style="font-size:10px;color:var(--muted);margin-top:4px">
-        في حال لم يتم إغلاق اليوم من البرنامج، سيتم إغلاقه تلقائياً عند هذه الساعة.
-        <br>ننصح بتحديده بعد ساعة إلى ساعتين من موعد إغلاق المتجر الفعلي.
-      </p>
-    </div>
-    <button type="button" class="btn" onclick="saveCloseHour()" style="margin-bottom:16px">حفظ وقت الإغلاق</button>
 
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-        كلمة المرور الحالية: <strong id="pwStatus">—</strong>
+      <div class="settings-card">
+        <div class="settings-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          أمان الحساب
+        </div>
+        <div class="settings-inline">كلمة المرور الحالية: <strong id="pwStatus">—</strong></div>
+        <div class="fg" style="margin-top:8px">
+          <label>كلمة مرور جديدة (6 أحرف على الأقل)</label>
+          <input type="password" id="pw1">
+        </div>
+        <div class="fg">
+          <label>تأكيد كلمة المرور</label>
+          <input type="password" id="pw2">
+        </div>
+        <div class="merr" id="pwErr"></div>
+        <div class="msuc" id="pwSuc" style="display:none;background:var(--green-l);color:var(--green);border-radius:var(--rs);padding:8px;font-size:11px;font-weight:600;margin-bottom:10px;text-align:center"></div>
+        <button type="button" class="btn" onclick="changePw()">تغيير كلمة المرور</button>
       </div>
-      <div class="fg">
-        <label>كلمة مرور جديدة (6 أحرف على الأقل)</label>
-        <input type="password" id="pw1">
-      </div>
-      <div class="fg">
-        <label>تأكيد كلمة المرور</label>
-        <input type="password" id="pw2">
-      </div>
-      <div class="merr" id="pwErr"></div>
-      <div class="msuc" id="pwSuc" style="display:none;background:var(--green-l);color:var(--green);border-radius:var(--rs);padding:8px;font-size:11px;font-weight:600;margin-bottom:10px;text-align:center"></div>
-      <button type="button" class="btn" onclick="changePw()">تغيير كلمة المرور</button>
-    </div>
 
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
-      <button type="button" class="btn" onclick="openSupport()" style="background:linear-gradient(135deg,#25D366,#128C7E)">
-        تواصل مع الدعم الفني
-      </button>
-    </div>
-
-    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-        حالة الاشتراك: <strong id="subStatus">—</strong>
+      <div class="settings-card">
+        <div class="settings-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><path d="M3 6h18"/><path d="M3 18h18"/></svg>
+          حالة الاشتراك
+        </div>
+        <div class="settings-inline" style="margin-bottom:6px">الحالة: <strong id="subStatus">—</strong></div>
+        <div class="settings-inline">ينتهي في: <strong id="subExpiry">—</strong></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">
-        ينتهي في: <strong id="subExpiry">—</strong>
+
+      <div class="settings-card">
+        <button type="button" class="btn" onclick="openSupport()" style="background:linear-gradient(135deg,#25D366,#128C7E)">
+          تواصل مع الدعم الفني
+        </button>
       </div>
     </div>
   </div>
@@ -574,6 +700,15 @@ function fmt(n) {
   if (n === null || n === undefined) return '—';
   if (isNaN(n)) return '—';
   return Number(n).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function formatHourLabel(hour24) {
+  if (hour24 === null || hour24 === undefined || isNaN(hour24)) return '—';
+  var h = Number(hour24);
+  var ampm = h >= 12 ? 'مساءً' : 'صباحاً';
+  var h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return h12 + ':00 ' + ampm;
 }
 
 function showModal(id) { document.getElementById(id).classList.add('on'); }
@@ -818,7 +953,7 @@ function loadSyncStatus() {
       var dt = new Date(d.last_doc_date);
       dateStr = dt.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Riyadh'}) + ' ' + dt.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh'});
     }
-    document.getElementById('syncInfo').textContent = 'آخر مزامنة: ' + dateStr;
+    document.getElementById('syncInfo').textContent = 'آخر مزامنة: ' + dateStr + ' • الإغلاق التلقائي: ' + formatHourLabel(CLOSE_HOUR);
     renderSyncHealthUnderBar(d);
     if (currentTab === 'today' || currentTab === 'yesterday' || currentTab === 'month') {
       loadTabData();
@@ -1164,6 +1299,8 @@ function openSettings() {
   var ampm = hour24 < 12 ? 'AM' : 'PM';
   document.getElementById('setHour').value = hour12;
   document.getElementById('setAmpm').value = ampm;
+  document.getElementById('closeHourText').textContent = formatHourLabel(CLOSE_HOUR);
+  document.getElementById('closeHourSuc').style.display = 'none';
   document.getElementById('pwStatus').textContent = HAS_CUSTOM_PW ? 'كلمة مرور مخصصة' : 'رقم الجوال';
   document.getElementById('pw1').value = '';
   document.getElementById('pw2').value = '';
@@ -1244,6 +1381,7 @@ function updateSubExpiry() {
 function saveCloseHour() {
   var h = parseInt(document.getElementById('setHour').value);
   var ampm = document.getElementById('setAmpm').value;
+  var sucEl = document.getElementById('closeHourSuc');
   if (isNaN(h) || h < 1 || h > 12) { alert('يرجى إدخال رقم صحيح بين 1 و 12'); return; }
   var hour24 = h;
   if (ampm === 'PM' && h !== 12) hour24 = h + 12;
@@ -1256,7 +1394,9 @@ function saveCloseHour() {
   .then(function(r) {
     if (!r.ok) throw new Error('fail');
     CLOSE_HOUR = hour24;
-    hideModal('settingsModal');
+    document.getElementById('closeHourText').textContent = formatHourLabel(CLOSE_HOUR);
+    if (sucEl) sucEl.style.display = 'block';
+    loadSyncStatus();
   })
   .catch(function() { alert('حدث خطأ في الحفظ'); });
 }
@@ -1512,11 +1652,13 @@ function renderNotifications(notifications) {
   notifications.forEach(function(notif) {
     var unreadClass = notif.is_read ? '' : ' unread';
     var typeClass = ' notif-type-' + (notif.type || 'info').replace(/[^a-z0-9_]/g, '');
+    var typeText = notifTypeLabel(notif.type);
+    var typeChipClass = 'notif-chip notif-chip-' + (notif.type || 'info').replace(/[^a-z0-9_]/g, '');
     var time = formatNotifTime(notif.created_at);
     
     html += '<div class="notif-item' + unreadClass + typeClass + '" data-id="' + escapeHtml(notif.id) + '">';
     html += '<div class="notif-msg">' + escapeHtml(notif.message) + '</div>';
-    html += '<div class="notif-time">' + time + '</div>';
+    html += '<div class="notif-meta"><span class="' + typeChipClass + '">' + escapeHtml(typeText) + '</span><span class="notif-time">' + time + '</span></div>';
     html += '</div>';
   });
   
@@ -1530,6 +1672,17 @@ function renderNotifications(notifications) {
       if (id) markAsRead(id);
     });
   });
+}
+
+function notifTypeLabel(type) {
+  if (type === 'daily_close') return 'إغلاق يومي';
+  if (type === 'auto_close') return 'إغلاق تلقائي';
+  if (type === 'tax_ready') return 'إقرار ضريبي';
+  if (type === 'vat_reminder') return 'تذكير ضريبة';
+  if (type === 'invoice_modified') return 'تعديل فاتورة';
+  if (type === 'invoice_deleted') return 'حذف فاتورة';
+  if (type === 'store_open') return 'فتح يوم';
+  return 'تنبيه';
 }
 
 function formatNotifTime(isoString) {
@@ -1873,31 +2026,31 @@ document.addEventListener('click', function(e) {
 async function loadBackupsTab() {
   var branchParam = CURRENT_BRANCH ? '?branch_id=' + encodeURIComponent(CURRENT_BRANCH) : '';
   var container = document.getElementById('dashboardContent');
-  container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">جارٍ التحميل...</div>';
+  container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">جارٍ تحميل نسخ قواعد البيانات...</div>';
   try {
     var r = await fetch('/api/portal/backups' + branchParam, { headers: { Authorization: 'Bearer ' + TOKEN } });
     var d = await r.json();
     var backups = d.backups || [];
-    var html = '<div style="padding:16px 0">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;color:var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
-      + '<span style="font-size:15px;font-weight:700">نسخ قواعد البيانات</span>'
+    var html = '<div class="backup-wrap">'
+      + '<div class="backup-head">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+      + '<span class="backup-title">نسخ قواعد البيانات</span>'
       + '</div>';
     if (!backups.length) {
       html += '<div style="text-align:center;padding:40px;color:var(--muted);font-size:13px">لا توجد نسخ احتياطية بعد — ستُنشأ تلقائياً بعد إغلاق اليوم</div>';
     } else {
-      html += '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">آخر نسخة: ' + backups[0].backup_date + ' — إجمالي: ' + backups.length + ' نسخة</div>';
-      html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">';
-      html += '<div style="display:grid;grid-template-columns:120px 1fr 90px 90px;gap:0;padding:8px 14px;background:var(--bg2);font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">'
+      html += '<div class="backup-meta">آخر نسخة: ' + backups[0].backup_date + ' — إجمالي: ' + backups.length + ' نسخة</div>';
+      html += '<div class="backup-table">';
+      html += '<div class="backup-row head">'
         + '<div>التاريخ</div><div>الفرع</div><div>الحجم</div><div></div></div>';
       backups.forEach(function(b) {
         var kb = b.file_size_bytes ? (Math.round(b.file_size_bytes / 1024) + ' KB') : '—';
         var branchLabel = b.branch_name || '—';
-        html += '<div style="display:grid;grid-template-columns:120px 1fr 90px 90px;gap:0;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;align-items:center">'
-          + '<div style="font-weight:600">' + b.backup_date + '</div>'
+        html += '<div class="backup-row">'
+          + '<div class="backup-date">' + b.backup_date + '</div>'
           + '<div>' + escapeHtml(branchLabel) + '</div>'
           + '<div style="color:var(--muted)">' + kb + '</div>'
-          + '<div><button onclick="downloadBackup(\'' + b.id + '\')" style="font-size:11px;padding:4px 12px;border:1px solid var(--accent);border-radius:6px;background:transparent;color:var(--accent);cursor:pointer;font-weight:600">⬇ تنزيل</button></div>'
+          + '<div><button onclick="downloadBackup(\'' + b.id + '\')" class="backup-btn">⬇ تنزيل</button></div>'
           + '</div>';
       });
       html += '</div>';
@@ -1906,32 +2059,6 @@ async function loadBackupsTab() {
     container.innerHTML = html;
   } catch(e) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);font-size:13px">تعذّر تحميل النسخ الاحتياطية</div>';
-  }
-}
-
-async function loadBackups() {
-  var el = document.getElementById('backupStatus');
-  var list = document.getElementById('backupList');
-  if (!el) return;
-  try {
-    var r = await fetch('/api/portal/backups', { headers: { Authorization: 'Bearer ' + TOKEN } });
-    var d = await r.json();
-    var backups = d.backups || [];
-    if (!backups.length) {
-      el.textContent = 'لا توجد نسخ احتياطية بعد — ستُنشأ يومياً بعد الساعة 2 صباحاً';
-      list.innerHTML = '';
-      return;
-    }
-    el.textContent = 'آخر نسخة: ' + backups[0].backup_date;
-    list.innerHTML = backups.slice(0, 7).map(function(b) {
-      var kb = b.file_size_bytes ? (Math.round(b.file_size_bytes / 1024) + ' KB') : '';
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px">'
-        + '<span>' + b.backup_date + (kb ? ' <span style="color:var(--muted)">(' + kb + ')</span>' : '') + '</span>'
-        + '<button onclick="downloadBackup(\'' + b.id + '\')" style="font-size:10px;padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer">تنزيل</button>'
-        + '</div>';
-    }).join('');
-  } catch(e) {
-    el.textContent = 'تعذّر تحميل النسخ الاحتياطية';
   }
 }
 
