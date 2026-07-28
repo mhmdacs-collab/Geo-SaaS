@@ -54,6 +54,25 @@ else:
 JWT_TTL_DAYS = int(os.environ.get("JWT_TTL_DAYS", "30"))  # Reduced from 365 to 30 days
 SUPPORT_WA = os.environ.get("SUPPORT_WA", "966558110150")
 
+# ── R2 Cloud Backup ────────────────────────────────────────────────────────
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_BUCKET = os.environ.get("R2_BUCKET", "casher-sync-backups")
+R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL", "")
+
+
+def _get_r2_client():
+    if not all([R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL]):
+        return None
+    import boto3
+    return boto3.client(
+        "s3",
+        endpoint_url=R2_ENDPOINT_URL,
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        region_name="auto",
+    )
+
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL env var is required")
 if not JWT_SECRET:
@@ -1105,8 +1124,47 @@ async def agent_day_status(req: dict, ctx: AgentCtx = Depends(require_agent)):
 
 
 # ────────────────────────────────────────────────────────────────────────────
-# Static files (dashboard)
+# Cloud Backup Upload
 # ────────────────────────────────────────────────────────────────────────────
+@app.post("/api/v1/backup/upload")
+async def upload_backup(
+    request: Request,
+    backup_date: str,
+    ctx: AgentCtx = Depends(require_agent),
+):
+    """Agent uploads a gzipped SQLite snapshot for cloud backup."""
+    r2 = _get_r2_client()
+    if not r2:
+        raise HTTPException(503, "Cloud backup not configured on server")
+
+    body = await request.body()
+    if not body:
+        raise HTTPException(400, "Empty backup file")
+
+    file_key = f"{ctx.tenant_id}/{ctx.device_id}/{backup_date}.gz"
+
+    try:
+        import io
+        r2.upload_fileobj(io.BytesIO(body), R2_BUCKET, file_key)
+    except Exception as e:
+        log.error(f"R2 upload failed: {e}")
+        raise HTTPException(500, "Upload to cloud storage failed")
+
+    pool: asyncpg.Pool = app.state.pool
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """INSERT INTO db_backups (tenant_id, device_id, backup_date, file_key, file_size_bytes)
+               VALUES ($1::uuid, $2::uuid, $3::date, $4, $5)
+               ON CONFLICT (tenant_id, device_id, backup_date)
+               DO UPDATE SET file_key=EXCLUDED.file_key,
+                             file_size_bytes=EXCLUDED.file_size_bytes,
+                             created_at=NOW()
+               RETURNING id""",
+            ctx.tenant_id, ctx.device_id, backup_date, file_key, len(body),
+        )
+
+    log.info(f"Backup recorded: tenant={ctx.tenant_id} device={ctx.device_id} date={backup_date} size={len(body):,}")
+    return {"backup_id": row["id"], "file_size_bytes": len(body)}
 _static_dir = pathlib.Path(__file__).parent / "static"
 if _static_dir.is_dir():
     app.mount("/", StaticFiles(directory=str(_static_dir), html=True), name="static")

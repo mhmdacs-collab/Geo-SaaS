@@ -111,6 +111,7 @@ class AgentConfig:
     batch_size: int = 500
     aronium_db_path: Optional[str] = None
     verify_tls: bool = True
+    backup_hour: int = 2
 
     @classmethod
     def load(cls) -> "AgentConfig":
@@ -134,6 +135,7 @@ class AgentConfig:
             batch_size=int(raw.get("batch_size", 500)),
             aronium_db_path=raw.get("aronium_db_path"),
             verify_tls=bool(raw.get("verify_tls", True)),
+            backup_hour=int(raw.get("backup_hour", 2)),
         )
 
 
@@ -558,6 +560,26 @@ class ApiClient:
 
     def heartbeat(self, payload: Dict[str, Any]) -> None:
         self._post_retry("/api/v1/agents/heartbeat", payload, 15, expects_json=False)
+
+    def _headers_binary(self) -> Dict[str, str]:
+        h = self._headers()
+        h["Content-Type"] = "application/octet-stream"
+        return h
+
+    def upload_backup(self, gz_path: str, backup_date: str) -> Dict[str, Any]:
+        """Upload a gzipped backup file to the server."""
+        url = f"{self.cfg.api_base_url}/api/v1/backup/upload"
+        with open(gz_path, "rb") as f:
+            r = self.session.post(
+                url,
+                params={"backup_date": backup_date},
+                data=f,
+                headers=self._headers_binary(),
+                timeout=300,
+                verify=self.cfg.verify_tls,
+            )
+        r.raise_for_status()
+        return r.json()
 
     def upsert(self, table: str, rows: List[Dict[str, Any]]) -> None:
         if not rows:
@@ -1074,6 +1096,52 @@ def run_reconcile_cycle(cfg: AgentConfig, api: ApiClient, snap_path: str) -> Non
 
 
 # ─── Main ────────────────────────────────────────────────────────────────────
+def _should_run_backup(cfg: "AgentConfig") -> bool:
+    """Return True if it's time to run today's backup (once per day after backup_hour)."""
+    if not cfg.aronium_db_path:
+        return False
+    now = datetime.now()
+    if now.hour < cfg.backup_hour:
+        return False
+    today = now.strftime("%Y-%m-%d")
+    return _kv_get("last_backup_date", "") != today
+
+
+def run_backup(cfg: "AgentConfig", api: "ApiClient", db_path: str) -> bool:
+    """Compress Aronium DB and upload to cloud via API. Returns True on success."""
+    import gzip
+    today = datetime.now().strftime("%Y-%m-%d")
+    logger.info(f"[backup] Starting daily backup for {today}")
+
+    snap = snapshot_db(db_path)
+    if not snap:
+        logger.error("[backup] DB snapshot failed - skipping backup")
+        return False
+
+    tmp_gz = snap + ".gz"
+    try:
+        with open(snap, "rb") as f_in, gzip.open(tmp_gz, "wb", compresslevel=6) as f_out:
+            f_out.write(f_in.read())
+
+        size_bytes = os.path.getsize(tmp_gz)
+        logger.info(f"[backup] Compressed: {size_bytes:,} bytes - uploading...")
+
+        result = api.upload_backup(tmp_gz, today)
+        _kv_set("last_backup_date", today)
+        logger.info(f"[backup] Done - backup_id={result.get('backup_id')} size={size_bytes:,}")
+        return True
+
+    except Exception as e:
+        logger.error(f"[backup] Failed: {e}")
+        return False
+    finally:
+        for p in (snap, tmp_gz):
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+
+
 def main() -> None:
     cfg = AgentConfig.load()
     _init_state_db()
@@ -1132,6 +1200,13 @@ def main() -> None:
                 })
             except Exception as e:
                 logger.warning(LOG["heartbeat_fail"].format(reason=str(e)))
+
+            # Daily cloud backup (runs once per day after backup_hour)
+            if _should_run_backup(cfg):
+                try:
+                    run_backup(cfg, api, db_path)
+                except Exception as e:
+                    logger.error(f"[backup] Unhandled error: {e}")
 
         except SubscriptionError as e:
             logger.error(str(e) or LOG["sub_expired"])
