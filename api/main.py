@@ -1138,6 +1138,7 @@ async def upload_backup(
         raise HTTPException(503, "Cloud backup not configured on server")
 
     body = await request.body()
+    log.info(f"[backup] Received upload: backup_date={backup_date} body_size={len(body)} bytes")
     if not body:
         raise HTTPException(400, "Empty backup file")
 
@@ -1150,17 +1151,22 @@ async def upload_backup(
         log.error(f"R2 upload failed: {e}")
         raise HTTPException(500, "Upload to cloud storage failed")
 
+    try:
+        backup_date_obj = date.fromisoformat(backup_date)
+    except ValueError:
+        raise HTTPException(400, "Invalid backup_date format; expected YYYY-MM-DD")
+
     pool: asyncpg.Pool = app.state.pool
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """INSERT INTO db_backups (tenant_id, device_id, backup_date, file_key, file_size_bytes)
-               VALUES ($1::uuid, $2::uuid, $3::date, $4, $5)
+               VALUES ($1::uuid, $2::uuid, $3, $4, $5)
                ON CONFLICT (tenant_id, device_id, backup_date)
                DO UPDATE SET file_key=EXCLUDED.file_key,
                              file_size_bytes=EXCLUDED.file_size_bytes,
                              created_at=NOW()
                RETURNING id""",
-            ctx.tenant_id, ctx.device_id, backup_date, file_key, len(body),
+            ctx.tenant_id, ctx.device_id, backup_date_obj, file_key, len(body),
         )
 
     log.info(f"Backup recorded: tenant={ctx.tenant_id} device={ctx.device_id} date={backup_date} size={len(body):,}")
