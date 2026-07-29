@@ -65,7 +65,7 @@ button,input,select{font-family:inherit}
 
 /* ── STATUS BAR ── */
 .status-bar{
-  position:fixed;top:0;left:0;right:0;height:32px;
+  position:fixed;top:0;left:0;right:0;height:40px;
   background:var(--gray-800);color:#e5e7eb;
   z-index:60;display:flex;align-items:center;
   padding:0 16px;gap:16px;font-size:11px;
@@ -82,7 +82,7 @@ button,input,select{font-family:inherit}
 /* ── APP LAYOUT ── */
 #appPage{display:none}
 .app-header{
-  position:fixed;top:32px;left:0;right:0;height:56px;
+  position:fixed;top:40px;left:0;right:0;height:56px;
   background:#fff;border-bottom:1px solid var(--gray-200);
   display:flex;align-items:center;justify-content:space-between;
   padding:0 20px;z-index:50;box-shadow:0 1px 0 var(--gray-200)
@@ -97,7 +97,7 @@ button,input,select{font-family:inherit}
 .hdr-btn:hover{background:var(--primary-light);border-color:var(--primary);color:var(--primary-dark)}
 .hdr-btn i{width:13px;height:13px}
 
-.app-body{display:flex;padding-top:88px;min-height:100vh}
+.app-body{display:flex;padding-top:96px;min-height:100vh}
 
 /* ── SIDEBAR ── */
 .sidebar{
@@ -105,8 +105,8 @@ button,input,select{font-family:inherit}
   background:#fff;
   border-left:1px solid var(--gray-200);
   position:sticky;
-  top:88px;
-  height:calc(100vh - 88px);
+  top:96px;
+  height:calc(100vh - 96px);
   overflow-y:auto;
   flex-shrink:0;
   padding:14px 10px;
@@ -504,25 +504,25 @@ button,input,select{font-family:inherit}
   }
 
   /* Header */
-  .app-header{padding:0 12px;height:50px;top:32px}
+  .app-header{padding:0 12px;height:50px;top:40px}
   .hdr-info p{display:none}
   .hdr-info h1{font-size:13px}
   .hdr-btn span{display:none}
   .hdr-btn{padding:6px 8px}
   .notif-btn{padding:6px}
-  .notif-panel{position:fixed;top:82px;left:4px;right:4px;width:auto;max-height:400px}
+  .notif-panel{position:fixed;top:90px;left:4px;right:4px;width:auto;max-height:400px}
 
   /* Hide desktop sidebar entirely on mobile */
   .sidebar{display:none!important}
 
   /* App body: no sidebar, add bottom padding for bottom nav */
-  .app-body{padding-top:82px;flex-direction:column}
+  .app-body{padding-top:90px;flex-direction:column}
   .main{padding:12px 12px 80px 12px;min-height:auto}
 
   /* Mobile branch selector bar (horizontal scrollable) */
   .mobile-branch-bar{
     display:flex;
-    position:sticky;top:82px;z-index:38;
+    position:sticky;top:90px;z-index:38;
     background:#fff;border-bottom:1px solid var(--gray-200);
     padding:8px 12px;gap:6px;
     overflow-x:auto;-webkit-overflow-scrolling:touch;
@@ -570,7 +570,7 @@ button,input,select{font-family:inherit}
   .mob-nav-item.active i{color:var(--primary)}
 
   /* Metrics responsive */
-  .app-body{padding-top:82px}
+  .app-body{padding-top:90px}
   .mgrid{grid-template-columns:repeat(2,1fr);gap:8px}
   .mgrid-3{grid-template-columns:repeat(3,1fr);gap:6px}
   .mgrid-3 .mc-val{font-size:14px}
@@ -660,6 +660,10 @@ button,input,select{font-family:inherit}
       </div>
     </div>
     <div class="hdr-right">
+      <button class="hdr-btn" onclick="switchPage('settings',this)" id="hdrSettingsBtn" title="الإعدادات">
+        <i data-lucide="settings"></i>
+        <span>الإعدادات</span>
+      </button>
       <button class="notif-btn" onclick="toggleNotifications()" id="notifBtn">
         <i data-lucide="bell"></i>
         <span class="notif-badge" id="notifBadge"></span>
@@ -710,10 +714,6 @@ button,input,select{font-family:inherit}
           <i data-lucide="cloud"></i>
           النسخ الاحتياطي
         </button>
-        <button class="nav-item" data-page="settings" onclick="switchPage('settings',this)">
-          <i data-lucide="settings"></i>
-          الإعدادات
-        </button>
       </nav>
     </aside>
 
@@ -723,7 +723,7 @@ button,input,select{font-family:inherit}
       <!-- AI Manager card (dashboard only) -->
       <div id="aiManagerCard" class="ai-manager-card" style="display:none">
         <div class="ai-card-header">
-          <i data-lucide="brain-circuit"></i>
+          <i data-lucide="sparkles"></i>
           <span>المدير الذكي</span>
           <span class="ai-badge">AI</span>
         </div>
@@ -796,9 +796,9 @@ button,input,select{font-family:inherit}
       <i data-lucide="cloud"></i>
       <span>النسخ</span>
     </button>
-    <button class="mob-nav-item" data-page="settings" onclick="switchPage('settings',this)">
-      <i data-lucide="settings"></i>
-      <span>الإعدادات</span>
+    <button class="mob-nav-item" data-page="scan" id="mobScanBtn" onclick="switchPage('scan',this)" style="display:none">
+      <i data-lucide="scan-line"></i>
+      <span>مسح فاتورة</span>
     </button>
   </nav>
 
@@ -1181,7 +1181,7 @@ function loadSyncStatus() {
       var dt = new Date(d.last_doc_date);
       dateStr = dt.toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Riyadh'}) + ' ' + dt.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh'});
     }
-    document.getElementById('syncInfo').textContent = 'آخر مزامنة: ' + dateStr + ' • الإغلاق التلقائي: ' + formatHourLabel(CLOSE_HOUR);
+    document.getElementById('syncInfo').textContent = 'آخر مزامنة: ' + dateStr;
     renderSyncHealthUnderBar(d);
     if (currentTab === 'today' || currentTab === 'yesterday' || currentTab === 'month') {
       loadTabData();
@@ -1298,10 +1298,30 @@ function renderMonthData(d) {
     + metricCard(profitCls + ' mc-full', 'صافي الربح', fmt(net_profit), trendFoot(net_profit, prev_profit), netIcon())
     + '</div>';
 
-  // 4. قنوات الدفع
+  // 4. بطاقة الضريبة المستحقة (من بيانات الربع الحالي)
+  var vatDue = 0;
+  var vatLabel = 'الضريبة المستحقة للربع الحالي';
+  if (lastQuarterData && lastQuarterData.current) {
+    vatDue = lastQuarterData.current.vat_due || 0;
+    vatLabel = 'الضريبة المستحقة — ' + (lastQuarterData.current.period_label || 'الربع الحالي');
+  } else {
+    // تقدير: 15% من (صافي المبيعات - صافي المشتريات) / 1.15
+    var netSalesEx = (cur.net_sales || 0) / 1.15;
+    var netPurchEx = ((cur.purchases || 0) - (cur.stock_return || 0)) / 1.15;
+    vatDue = Math.max(0, (netSalesEx - netPurchEx) * 0.15);
+    vatLabel = 'تقدير الضريبة المستحقة (15%)';
+  }
+  html += '<div class="mgrid"><div class="metric-card mc-w mc-full" style="border-right:3px solid var(--warning)">'
+    + '<div class="mc-header"><span class="mc-icon" style="background:var(--warning-light)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" style="width:14px;height:14px"><path d="M9 14 4 9l5-5M15 4l5 5-5 5M10 20l4-16"/></svg></span>'
+    + '<span class="mc-label">' + vatLabel + '</span></div>'
+    + '<div class="mc-val" style="color:var(--warning)">' + fmt(vatDue) + ' <small style="font-size:11px;font-weight:500">ريال</small></div>'
+    + '<div class="mc-foot" style="margin-top:6px"><button class="btn-sm-link" onclick="switchPage(\'tax\',document.querySelector(\'.nav-item[data-page=tax]\'))" style="font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;padding:0">عرض الإقرار ←</button></div>'
+    + '</div></div>';
+
+  // 5. قنوات الدفع
   html += renderPaymentsPanel(cur.payment_breakdown);
 
-  // 5. مقارنة الفروع (only when all branches) — by net profit
+  // 6. مقارنة الفروع (only when all branches) — by net profit
   if (CURRENT_BRANCH === null && cur.branch_breakdown) {
     html += renderBranchComparePanel(cur.branch_breakdown, 'net_profit', 'مقارنة الفروع — صافي الربح');
   }
@@ -2339,6 +2359,17 @@ async function downloadBackup(id) {
 var currentPage = 'dashboard';
 var lastDayData = null;
 
+/* ── DASHBOARD MONTH LOADER (silent day fetch for AI manager) ── */
+function loadDayForAI() {
+  fetch(API + '/day?offset=0' + tenantParam(), {headers: apiHeaders()})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      lastDayData = d;
+      updateAIManager(d, LAST_SYNC_STATUS);
+    })
+    .catch(function(){});
+}
+
 var PAGE_LABELS = {
   dashboard: {icon:'layout-dashboard', label:'لوحة التحكم'},
   operations: {icon:'receipt', label:'العمليات'},
@@ -2384,8 +2415,14 @@ function switchPage(page, el) {
   _updatePageContextBar(page);
 
   if (page === 'dashboard') {
-    switchTab('today', document.querySelector('.tab[onclick*="today"]'));
-    if (lastDayData) updateAIManager(lastDayData, LAST_SYNC_STATUS);
+    switchTab('month', document.querySelector('.tab[onclick*="month"]'));
+    loadDayForAI();
+    loadQuarterData(); // refresh VAT card data
+  } else if (page === 'scan') {
+    // scan is a tab within operations, not a full page
+    switchTab('scan', document.querySelector('.tab[onclick*="scan"]'));
+    if (opsSubTabs) opsSubTabs.style.display = 'none'; // hide ops sub-tabs for scan
+    if (aiCard) aiCard.style.display = 'none';
   } else if (page === 'operations') {
     var firstSubTab = document.querySelector('#opsSubTabs .sub-tab');
     if (firstSubTab) switchOpsTab('today', firstSubTab);
@@ -2591,7 +2628,7 @@ function updateAIManager(dayData, syncData) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-/* ── PATCH: updateScanTabVisibility — also handle backupNavItem ── */
+/* ── PATCH: updateScanTabVisibility — also handle backupNavItem + mobile scan btn ── */
 var _origUpdateScanTabVisibility = updateScanTabVisibility;
 updateScanTabVisibility = function() {
   _origUpdateScanTabVisibility();
@@ -2601,6 +2638,9 @@ updateScanTabVisibility = function() {
   // Show backup nav only for all-branches view
   var backupNavItem = document.getElementById('backupNavItem');
   if (backupNavItem) backupNavItem.style.display = (CURRENT_BRANCH === null) ? '' : 'none';
+  // Show scan button in mobile bottom nav only when a branch is selected
+  var mobScanBtn = document.getElementById('mobScanBtn');
+  if (mobScanBtn) mobScanBtn.style.display = (CURRENT_BRANCH !== null) ? '' : 'none';
 };
 
 /* ── PATCH: renderSyncHealthUnderBar — update status bar count ── */
