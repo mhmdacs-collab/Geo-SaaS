@@ -907,6 +907,7 @@ var SUB_EXP = null; // subscription expiry ISO string
 var lastQuarterData = null;
 var currentTab = 'today';
 var LAST_SYNC_STATUS = null;
+var ACTIVE_TAB_REQUEST_ID = 0;
 
 var API = '/api/portal';
 
@@ -1118,21 +1119,24 @@ function refreshData() {
 }
 
 function loadTabData() {
-  if (currentTab === 'today') loadDay(0);
-  else if (currentTab === 'yesterday') loadDay(-1);
-  else if (currentTab === 'month') loadMonth();
-  else if (currentTab === 'quarter') loadQuarterTab();
-  else if (currentTab === 'backups') loadBackupsTab();
+  var requestId = ++ACTIVE_TAB_REQUEST_ID;
+  if (currentTab === 'today') loadDay(0, requestId);
+  else if (currentTab === 'yesterday') loadDay(-1, requestId);
+  else if (currentTab === 'month') loadMonth(requestId);
+  else if (currentTab === 'quarter') loadQuarterTab(requestId);
+  else if (currentTab === 'backups') loadBackupsTab(requestId);
   else if (currentTab === 'scan') renderScanTab();
 }
 
-function loadDay(offset) {
+function loadDay(offset, requestId) {
+  if (requestId === undefined || requestId === null) requestId = ++ACTIVE_TAB_REQUEST_ID;
   Promise.all([
     fetch(API + '/day?offset=' + offset + tenantParam(), {headers: apiHeaders()}).then(function(r) { return r.json(); }),
     fetch(API + '/recent?offset=' + offset + tenantParam(), {headers: apiHeaders()}).then(function(r) { return r.json(); }),
     fetch(API + '/day?offset=' + (offset - 1) + tenantParam(), {headers: apiHeaders()}).then(function(r) { return r.json(); })
   ])
   .then(function(results) {
+    if (requestId !== ACTIVE_TAB_REQUEST_ID) return;
     var dayData = results[0];
     var recentData = results[1];
     var prevDayData = results[2] || {};
@@ -1141,19 +1145,23 @@ function loadDay(offset) {
   .catch(function() {});
 }
 
-function loadMonth() {
+function loadMonth(requestId) {
+  if (requestId === undefined || requestId === null) requestId = ++ACTIVE_TAB_REQUEST_ID;
   fetch(API + '/month-compare' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
   .then(function(r) { return r.json(); })
   .then(function(d) {
+    if (requestId !== ACTIVE_TAB_REQUEST_ID) return;
     renderMonthData(d);
   })
   .catch(function() {});
 }
 
-function loadQuarterTab() {
+function loadQuarterTab(requestId) {
+  if (requestId === undefined || requestId === null) requestId = ++ACTIVE_TAB_REQUEST_ID;
   fetch(API + '/quarter' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
   .then(function(r) { return r.json(); })
   .then(function(d) {
+    if (requestId !== ACTIVE_TAB_REQUEST_ID) return;
     renderQuarterData(d);
   })
   .catch(function() {});
@@ -2278,13 +2286,15 @@ document.addEventListener('click', function(e) {
 });
 
 /* ── Cloud Backup ── */
-async function loadBackupsTab() {
+async function loadBackupsTab(requestId) {
+  if (requestId === undefined || requestId === null) requestId = ++ACTIVE_TAB_REQUEST_ID;
   var branchParam = CURRENT_BRANCH ? '?branch_id=' + encodeURIComponent(CURRENT_BRANCH) : '';
   var container = document.getElementById('dashboardContent');
   container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px">جارٍ تحميل نسخ قواعد البيانات...</div>';
   try {
     var r = await fetch('/api/portal/backups' + branchParam, { headers: { Authorization: 'Bearer ' + TOKEN } });
     var d = await r.json();
+    if (requestId !== ACTIVE_TAB_REQUEST_ID) return;
     var backups = d.backups || [];
     var hasBackups = backups.length > 0;
     var first = hasBackups ? backups[0] : null;
@@ -2337,6 +2347,7 @@ async function loadBackupsTab() {
     html += '</div>';
     container.innerHTML = html;
   } catch(e) {
+    if (requestId !== ACTIVE_TAB_REQUEST_ID) return;
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--red);font-size:13px">تعذّر تحميل النسخ الاحتياطية</div>';
   }
 }
