@@ -2428,6 +2428,7 @@ function _updatePageContextBar(page) {
     if (badgeEl) badgeEl.style.display = (page==='dashboard') ? 'none' : '';
     if (nameEl) nameEl.textContent = 'جميع الفروع';
   }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function switchPage(page, el) {
