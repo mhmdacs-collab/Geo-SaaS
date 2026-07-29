@@ -794,13 +794,13 @@ button,input,select{font-family:inherit}
       <i data-lucide="file-text"></i>
       <span>الإقرار</span>
     </button>
-    <button class="mob-nav-item" data-page="backup" onclick="switchPage('backup',this)">
-      <i data-lucide="cloud"></i>
-      <span>النسخ</span>
-    </button>
     <button class="mob-nav-item" data-page="scan" id="mobScanBtn" onclick="switchPage('scan',this)" style="display:none">
       <i data-lucide="scan-line"></i>
       <span>مسح فاتورة</span>
+    </button>
+    <button class="mob-nav-item" data-page="backup" onclick="switchPage('backup',this)">
+      <i data-lucide="cloud"></i>
+      <span>النسخ</span>
     </button>
   </nav>
 
@@ -907,7 +907,9 @@ var SUB_EXP = null; // subscription expiry ISO string
 var lastQuarterData = null;
 var currentTab = 'today';
 var LAST_SYNC_STATUS = null;
+var LAST_SYNC_BRANCH_KEY = '__all__';
 var ACTIVE_TAB_REQUEST_ID = 0;
+var ACTIVE_SYNC_REQUEST_ID = 0;
 
 var API = '/api/portal';
 
@@ -1077,22 +1079,15 @@ function updateScanTabVisibility() {
     if (CURRENT_BRANCH === null) {
       scanTab.style.display = 'none';
       if (currentTab === 'scan') {
-        switchTab('today', document.querySelector('.tab[onclick*="today"]'));
+        // From all-branches view, scan is not valid. Go to dashboard.
+        switchPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]'));
       }
     } else {
       scanTab.style.display = '';
     }
   }
-  if (backupsTab) {
-    if (CURRENT_BRANCH === null) {
-      backupsTab.style.display = '';
-    } else {
-      backupsTab.style.display = 'none';
-      if (currentTab === 'backups') {
-        switchTab('today', document.querySelector('.tab[onclick*="today"]'));
-      }
-    }
-  }
+  // Backups is available for all branches and per-branch (filtered by branch_id)
+  if (backupsTab) backupsTab.style.display = '';
 }
 
 function selectDefaultBranch() {
@@ -1188,10 +1183,14 @@ function loadSyncStatus() {
     renderSyncHealthUnderBar(LAST_SYNC_STATUS || {});
     return;
   }
+  var reqId = ++ACTIVE_SYNC_REQUEST_ID;
+  var branchKey = CURRENT_BRANCH || '__all__';
   fetch(API + '/sync-status' + (CURRENT_BRANCH ? '?tenant_id=' + encodeURIComponent(CURRENT_BRANCH) : ''), {headers: apiHeaders()})
   .then(function(r) { return r.json(); })
   .then(function(d) {
+    if (reqId !== ACTIVE_SYNC_REQUEST_ID) return;
     LAST_SYNC_STATUS = d;
+    LAST_SYNC_BRANCH_KEY = branchKey;
     var dateStr = '—';
     if (d.last_doc_date) {
       var dt = new Date(d.last_doc_date);
@@ -1199,6 +1198,9 @@ function loadSyncStatus() {
     }
     document.getElementById('syncInfo').textContent = 'آخر مزامنة: ' + dateStr;
     renderSyncHealthUnderBar(d);
+    if (currentPage === 'dashboard' && lastDayData) {
+      updateAIManager(lastDayData, d);
+    }
     if (currentTab === 'today' || currentTab === 'yesterday' || currentTab === 'month') {
       loadTabData();
     }
@@ -1314,28 +1316,30 @@ function renderMonthData(d) {
     + metricCard(profitCls + ' mc-full', 'صافي الربح', fmt(net_profit), trendFoot(net_profit, prev_profit), netIcon())
     + '</div>';
 
-  // 4. بطاقة الضريبة المستحقة — نفس نمط metricCard
-  var vatDue = 0;
-  var vatLabel = 'الضريبة المستحقة (الربع الحالي)';
-  if (lastQuarterData && lastQuarterData.current) {
-    vatDue = lastQuarterData.current.vat_due || 0;
-    vatLabel = 'ضريبة مستحقة — ' + (lastQuarterData.current.period_label || 'الربع الحالي');
-  } else {
-    var netSalesEx = (cur.net_sales || 0) / 1.15;
-    var netPurchEx = ((cur.purchases || 0) - (cur.stock_return || 0)) / 1.15;
-    vatDue = Math.max(0, (netSalesEx - netPurchEx) * 0.15);
-    vatLabel = 'تقدير الضريبة المستحقة';
+  // 4. بطاقة الضريبة المستحقة (الرئيسية فقط)
+  if (currentPage === 'dashboard') {
+    var vatDue = 0;
+    var vatLabel = 'الضريبة المستحقة (الربع الحالي)';
+    if (lastQuarterData && lastQuarterData.current) {
+      vatDue = lastQuarterData.current.vat_due || 0;
+      vatLabel = 'ضريبة مستحقة — ' + (lastQuarterData.current.period_label || 'الربع الحالي');
+    } else {
+      var netSalesEx = (cur.net_sales || 0) / 1.15;
+      var netPurchEx = ((cur.purchases || 0) - (cur.stock_return || 0)) / 1.15;
+      vatDue = Math.max(0, (netSalesEx - netPurchEx) * 0.15);
+      vatLabel = 'تقدير الضريبة المستحقة';
+    }
+    var vatIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14 4 9l5-5M15 4l5 5-5 5M10 20l4-16"/></svg>';
+    html += '<div class="mgrid">'
+      + '<div class="mc mc-p mc-full"><div class="mc-head">'
+      + '<span class="mc-label">' + vatLabel + '</span>'
+      + '<div class="mc-ico">' + vatIcon + '</div>'
+      + '</div>'
+      + '<div class="mc-val" style="color:var(--warning)">' + fmt(vatDue) + '<small style="font-size:11px;font-weight:500;color:var(--muted)"> ريال</small></div>'
+      + '<div class="mc-foot"><button onclick="switchPage(\'tax\',document.querySelector(\'.nav-item[data-page=tax]\'))" style="font-size:10px;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:700;padding:0">عرض الإقرار الكامل ←</button></div>'
+      + '</div>'
+      + '</div>';
   }
-  var vatIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14 4 9l5-5M15 4l5 5-5 5M10 20l4-16"/></svg>';
-  html += '<div class="mgrid">'
-    + '<div class="mc mc-p mc-full"><div class="mc-head">'
-    + '<span class="mc-label">' + vatLabel + '</span>'
-    + '<div class="mc-ico">' + vatIcon + '</div>'
-    + '</div>'
-    + '<div class="mc-val" style="color:var(--warning)">' + fmt(vatDue) + '<small style="font-size:11px;font-weight:500;color:var(--muted)"> ريال</small></div>'
-    + '<div class="mc-foot"><button onclick="switchPage(\'tax\',document.querySelector(\'.nav-item[data-page=tax]\'))" style="font-size:10px;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:700;padding:0">عرض الإقرار الكامل ←</button></div>'
-    + '</div>'
-    + '</div>';
 
   // 5. قنوات الدفع
   html += renderPaymentsPanel(cur.payment_breakdown);
@@ -2385,6 +2389,7 @@ var ACTIVE_AI_REQUEST_ID = 0;
 /* ── DASHBOARD MONTH LOADER (silent day fetch for AI manager) ── */
 function loadDayForAI() {
   var reqId = ++ACTIVE_AI_REQUEST_ID;
+  var branchKey = CURRENT_BRANCH || '__all__';
   // Show loading state
   var listEl = document.getElementById('aiInsightsList');
   if (listEl) listEl.innerHTML = '<div class="ai-insight ai-insight-info"><i data-lucide="loader"></i><span>جارٍ تحليل البيانات...</span></div>';
@@ -2393,7 +2398,8 @@ function loadDayForAI() {
     .then(function(d){
       if (reqId !== ACTIVE_AI_REQUEST_ID) return;
       lastDayData = d;
-      updateAIManager(d, LAST_SYNC_STATUS);
+      var syncForThisBranch = (LAST_SYNC_BRANCH_KEY === branchKey) ? LAST_SYNC_STATUS : null;
+      updateAIManager(d, syncForThisBranch);
       if (typeof lucide !== 'undefined') lucide.createIcons();
     })
     .catch(function(){});
@@ -2404,6 +2410,7 @@ var PAGE_LABELS = {
   operations: {icon:'receipt', label:'العمليات'},
   tax: {icon:'file-text', label:'الإقرار الضريبي'},
   backup: {icon:'cloud', label:'النسخ الاحتياطي'},
+  scan: {icon:'scan-line', label:'مسح فاتورة'},
   settings: {icon:'settings', label:'الإعدادات'}
 };
 
@@ -2661,16 +2668,16 @@ function updateAIManager(dayData, syncData) {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-/* ── PATCH: updateScanTabVisibility — also handle backupNavItem + mobile scan btn ── */
+/* ── PATCH: updateScanTabVisibility — mobile scan btn + keep backups visible ── */
 var _origUpdateScanTabVisibility = updateScanTabVisibility;
 updateScanTabVisibility = function() {
   _origUpdateScanTabVisibility();
   // Update scan button in operations sub-tabs
   var scanBtn = document.getElementById('scanBtnInOps');
   if (scanBtn) scanBtn.style.display = (CURRENT_BRANCH !== null && currentPage === 'operations') ? '' : 'none';
-  // Show backup nav only for all-branches view
+  // Keep backup nav visible (backup supports all/branch filtered view)
   var backupNavItem = document.getElementById('backupNavItem');
-  if (backupNavItem) backupNavItem.style.display = (CURRENT_BRANCH === null) ? '' : 'none';
+  if (backupNavItem) backupNavItem.style.display = '';
   // Show scan button in mobile bottom nav only when a branch is selected
   var mobScanBtn = document.getElementById('mobScanBtn');
   if (mobScanBtn) mobScanBtn.style.display = (CURRENT_BRANCH !== null) ? '' : 'none';
