@@ -585,6 +585,8 @@ button,input,select{font-family:inherit}
   .sub-tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
   .sub-tabs::-webkit-scrollbar{display:none}
   .sub-tab{flex-shrink:0}
+  /* scan btn already in bottom nav on mobile */
+  #scanBtnInOps{display:none!important}
   .page-context-bar{margin-bottom:10px;padding-bottom:8px}
   .page-context-title{font-size:14px}
 }
@@ -977,6 +979,8 @@ function doLogin() {
     document.getElementById('appPage').style.display = 'block';
 
     renderSidebar();
+    // Set dashboard default tab to month BEFORE selectDefaultBranch triggers loadTabData
+    currentTab = 'month';
     selectDefaultBranch();
     startNotificationPolling();
 
@@ -1298,25 +1302,28 @@ function renderMonthData(d) {
     + metricCard(profitCls + ' mc-full', 'صافي الربح', fmt(net_profit), trendFoot(net_profit, prev_profit), netIcon())
     + '</div>';
 
-  // 4. بطاقة الضريبة المستحقة (من بيانات الربع الحالي)
+  // 4. بطاقة الضريبة المستحقة — نفس نمط metricCard
   var vatDue = 0;
-  var vatLabel = 'الضريبة المستحقة للربع الحالي';
+  var vatLabel = 'الضريبة المستحقة (الربع الحالي)';
   if (lastQuarterData && lastQuarterData.current) {
     vatDue = lastQuarterData.current.vat_due || 0;
-    vatLabel = 'الضريبة المستحقة — ' + (lastQuarterData.current.period_label || 'الربع الحالي');
+    vatLabel = 'ضريبة مستحقة — ' + (lastQuarterData.current.period_label || 'الربع الحالي');
   } else {
-    // تقدير: 15% من (صافي المبيعات - صافي المشتريات) / 1.15
     var netSalesEx = (cur.net_sales || 0) / 1.15;
     var netPurchEx = ((cur.purchases || 0) - (cur.stock_return || 0)) / 1.15;
     vatDue = Math.max(0, (netSalesEx - netPurchEx) * 0.15);
-    vatLabel = 'تقدير الضريبة المستحقة (15%)';
+    vatLabel = 'تقدير الضريبة المستحقة';
   }
-  html += '<div class="mgrid"><div class="metric-card mc-w mc-full" style="border-right:3px solid var(--warning)">'
-    + '<div class="mc-header"><span class="mc-icon" style="background:var(--warning-light)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" style="width:14px;height:14px"><path d="M9 14 4 9l5-5M15 4l5 5-5 5M10 20l4-16"/></svg></span>'
-    + '<span class="mc-label">' + vatLabel + '</span></div>'
-    + '<div class="mc-val" style="color:var(--warning)">' + fmt(vatDue) + ' <small style="font-size:11px;font-weight:500">ريال</small></div>'
-    + '<div class="mc-foot" style="margin-top:6px"><button class="btn-sm-link" onclick="switchPage(\'tax\',document.querySelector(\'.nav-item[data-page=tax]\'))" style="font-size:11px;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;padding:0">عرض الإقرار ←</button></div>'
-    + '</div></div>';
+  var vatIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14 4 9l5-5M15 4l5 5-5 5M10 20l4-16"/></svg>';
+  html += '<div class="mgrid">'
+    + '<div class="mc mc-p mc-full"><div class="mc-head">'
+    + '<span class="mc-label">' + vatLabel + '</span>'
+    + '<div class="mc-ico">' + vatIcon + '</div>'
+    + '</div>'
+    + '<div class="mc-val" style="color:var(--warning)">' + fmt(vatDue) + '<small style="font-size:11px;font-weight:500;color:var(--muted)"> ريال</small></div>'
+    + '<div class="mc-foot"><button onclick="switchPage(\'tax\',document.querySelector(\'.nav-item[data-page=tax]\'))" style="font-size:10px;color:var(--primary);background:none;border:none;cursor:pointer;font-weight:700;padding:0">عرض الإقرار الكامل ←</button></div>'
+    + '</div>'
+    + '</div>';
 
   // 5. قنوات الدفع
   html += renderPaymentsPanel(cur.payment_breakdown);
@@ -2396,6 +2403,10 @@ function _updatePageContextBar(page) {
 
 function switchPage(page, el) {
   currentPage = page;
+  // Clear content immediately to prevent flicker of previous page
+  var dc = document.getElementById('dashboardContent');
+  if (dc) dc.innerHTML = '';
+
   // Desktop sidebar nav
   document.querySelectorAll('.nav-item').forEach(function(b) { b.classList.remove('active'); });
   if (el && el.classList.contains('nav-item')) el.classList.add('active');
