@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -1064,6 +1064,10 @@ function selectBranch(deviceId) {
   updateSidebarActive();
   updateScanTabVisibility();
   refreshData();
+  // If on dashboard, refresh AI manager for the new branch immediately
+  if (currentPage === 'dashboard') {
+    loadDayForAI();
+  }
 }
 
 function updateScanTabVisibility() {
@@ -2376,14 +2380,21 @@ async function downloadBackup(id) {
 
 var currentPage = 'dashboard';
 var lastDayData = null;
+var ACTIVE_AI_REQUEST_ID = 0;
 
 /* ── DASHBOARD MONTH LOADER (silent day fetch for AI manager) ── */
 function loadDayForAI() {
+  var reqId = ++ACTIVE_AI_REQUEST_ID;
+  // Show loading state
+  var listEl = document.getElementById('aiInsightsList');
+  if (listEl) listEl.innerHTML = '<div class="ai-insight ai-insight-info"><i data-lucide="loader"></i><span>جارٍ تحليل البيانات...</span></div>';
   fetch(API + '/day?offset=0' + tenantParam(), {headers: apiHeaders()})
     .then(function(r){ return r.json(); })
     .then(function(d){
+      if (reqId !== ACTIVE_AI_REQUEST_ID) return;
       lastDayData = d;
       updateAIManager(d, LAST_SYNC_STATUS);
+      if (typeof lucide !== 'undefined') lucide.createIcons();
     })
     .catch(function(){});
 }
@@ -2681,15 +2692,13 @@ renderSyncHealthUnderBar = function(sync) {
   }
 };
 
-/* ── PATCH: renderDayData — capture lastDayData and update AI ── */
+/* ── PATCH: renderDayData — capture lastDayData (AI manager uses loadDayForAI) ── */
 var _origRenderDayData = renderDayData;
 renderDayData = function(d, recent, prev) {
   if (prev) d._prev_sales = prev.sales;
-  lastDayData = d;
+  // Only update lastDayData if this is from an AI-context request (dashboard page)
+  // On other pages (operations) we just render; AI uses loadDayForAI guard
   _origRenderDayData(d, recent, prev);
-  if (currentPage === 'dashboard') {
-    updateAIManager(d, LAST_SYNC_STATUS);
-  }
 };
 
 /* ── INIT: lucide icons + default page ── */
